@@ -20,11 +20,11 @@ Hi ![](https://user-images.githubusercontent.com/18350557/176309783-0785949b-912
 Web developer, Graphics designer and UI designer
 ------------------------------------------------
 
-I'm a 2nd year software engineering student. I have a lot of hand on skills like video editing, graphics design and 3d design using blender.
+I'm a 2nd year software engineering student. I can create really beautiful and eye catching webpages using HTML, CSS, and JS. I am acquainted with python and java. I also have hand on skills like video editing, graphics design and 3d design using blender. I am keenly interested in AI and ML and I will be documenting my progress here!
 
 * 🌍  I'm based in Nigeria
 * ✉️  You can contact me at [olugbengaakinbowale@gmail.com](mailto:olugbengaakinbowale@gmail.com)
-* 🧠  I'm learning Mobile app development using react.
+* 🧠  I'm learning AI and ML.
 * 🤝  I'm open to collaborating on Web development projects, UI/UX design projects
 * ⚡  Follow me on x: devjustin\_
 
