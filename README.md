@@ -17,15 +17,15 @@ Here are some ideas to get you started:
 Hi ![](https://user-images.githubusercontent.com/18350557/176309783-0785949b-9127-417c-8b55-ab5a4333674e.gif)My name is Justin
 ==============================================================================================================================
 
-Web developer, Graphics designer and UI designer
+Web developer, Data scientist and AI/ML Engineer 
 ------------------------------------------------
 
-I'm a 2nd year software engineering student. I can create really beautiful and eye catching webpages using HTML, CSS, and JS. I am acquainted with python and java. I also have hand on skills like video editing, graphics design and 3d design using blender. I am keenly interested in AI and ML and I will be documenting my progress here!
+I'm a 2nd year software engineering student. I can create really beautiful and eye catching webpages using HTML, CSS, and JS. I am acquainted with python and java. I also have hand on skills like video editing, graphics design and 3d design using blender, I'm basically a jack of all trades and I plan to master AI/ML Engineering and make it my forte. I am keenly interested in AI and ML and I will be documenting my progress here!
 
 * 🌍  I'm based in Nigeria
 * ✉️  You can contact me at [olugbengaakinbowale@gmail.com](mailto:olugbengaakinbowale@gmail.com)
 * 🧠  I'm learning AI and ML.
-* 🤝  I'm open to collaborating on Web development projects, UI/UX design projects
+* 🤝  I'm open to collaborating on Web development projects, AI/ML projects
 * ⚡  Follow me on x: devjustin\_
 
 <a href="https://www.x.com/DevJustin_" target="_blank" rel="noreferrer"><img
