@@ -11,8 +11,31 @@ import ipaddress
 from typing import Tuple
 from urllib.parse import urlparse
 from dotenv import load_dotenv  # type: ignore
+import re
 
 load_dotenv()
+
+def extract_json_from_response(text: str) -> dict:
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # Try to find a JSON block using regex
+        match = re.search(r'```(?:json)?\s*(.*?)\s*```', text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(1))
+            except json.JSONDecodeError:
+                pass
+
+        # If no markdown block, try to find the first '{' and last '}'
+        start = text.find('{')
+        end = text.rfind('}')
+        if start != -1 and end != -1 and end > start:
+            try:
+                return json.loads(text[start:end+1])
+            except json.JSONDecodeError:
+                pass
+        raise ValueError(f"Could not parse JSON from response")
 
 app = FastAPI()
 
@@ -129,10 +152,11 @@ Return JSON ONLY, with a single key "search_query" containing your query."""
             res1_json = resp1.json()
 
             content1 = res1_json['choices'][0]['message']['content']
-            query_data = json.loads(content1)
+            query_data = extract_json_from_response(content1)
             search_query = query_data.get("search_query", user_message)
         except Exception as e:
-            logger.error(f"Failed to get query from AI: {e}")
+            content1_preview = locals().get('content1', 'No content')
+            logger.error(f"Failed to get query from AI: {e}. Raw content: {content1_preview}")
             search_query = user_message
 
     # Step 2: Perform search
@@ -174,10 +198,11 @@ Or if not found:
             res2_json = resp2.json()
 
             content2 = res2_json['choices'][0]['message']['content']
-            final_data = json.loads(content2)
+            final_data = extract_json_from_response(content2)
             return final_data
         except Exception as e:
-            logger.error(f"Failed to parse final JSON from AI: {e}")
+            content2_preview = locals().get('content2', 'No content')
+            logger.error(f"Failed to parse final JSON from AI: {e}. Raw content: {content2_preview}")
             return {"status": "fail", "reason": "Could not extract download link from search results."}
 
 @app.post("/api/chat")
