@@ -1,11 +1,16 @@
-from fastapi import FastAPI, Request, HTTPException, Response
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import httpx
+# pyre-ignore-all-errors
+from fastapi import FastAPI, Request, HTTPException, Response  # type: ignore
+from fastapi.middleware.cors import CORSMiddleware  # type: ignore
+from pydantic import BaseModel  # type: ignore
+import httpx  # type: ignore
 import os
 import json
 import logging
-from dotenv import load_dotenv
+import socket
+import ipaddress
+from typing import Tuple
+from urllib.parse import urlparse
+from dotenv import load_dotenv  # type: ignore
 
 load_dotenv()
 
@@ -31,7 +36,7 @@ WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
 class ChatRequest(BaseModel):
     message: str
 
-async def search_web(query: str) -> dict:
+async def search_web(query: str) -> dict:  # type: ignore[return]
     # Use dummy data if API key is missing
     if not SERPER_API_KEY or SERPER_API_KEY == "your_serper_api_key_here":
         return {
@@ -58,7 +63,7 @@ async def search_web(query: str) -> dict:
             logger.error(f"Serper API error: {e}")
             return {}
 
-async def get_agent_response(user_message: str) -> dict:
+async def get_agent_response(user_message: str) -> dict:  # type: ignore[return]
     # Fallback response for missing API keys
     if not OPENROUTER_API_KEY or OPENROUTER_API_KEY == "your_openrouter_api_key_here":
         return {
@@ -103,7 +108,7 @@ Return JSON ONLY, with a single key "search_query" containing your query."""
 
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "HTTP-Referer": "http://localhost:8000",
+        "HTTP-Referer": "http://localhost:8001",
         "Content-Type": "application/json"
     }
 
@@ -180,10 +185,7 @@ async def chat_endpoint(request: ChatRequest):
     result = await get_agent_response(request.message)
     return result
 
-import ipaddress
-from urllib.parse import urlparse
-
-def is_valid_url(url: str) -> bool:
+def is_valid_url(url: str) -> Tuple[bool, str]:
     try:
         parsed = urlparse(url)
         if parsed.scheme not in ["http", "https"]:
@@ -196,14 +198,13 @@ def is_valid_url(url: str) -> bool:
         # Optional: Resolve hostname to IP and check if it's public.
         # This prevents accessing localhost or internal networks.
         # Since resolving every time can be complex asynchronously, we block obvious local IPs.
-        import socket
         try:
             ip = socket.gethostbyname(hostname)
             ip_obj = ipaddress.ip_address(ip)
             if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_multicast or ip_obj.is_reserved or ip_obj.is_link_local:
                 return False, "Invalid or restricted URL domain/IP."
         except socket.gaierror:
-            pass # DNS resolution failed, might still be valid or handled by httpx later
+            pass  # DNS resolution failed, might still be valid or handled by httpx later
 
         return True, ""
     except Exception as e:
@@ -220,10 +221,9 @@ async def download_endpoint(url: str):
             response = await client.get(url)
             response.raise_for_status()
 
-            headers = dict(response.headers)
+            headers: dict[str, str] = dict(response.headers)
             # Remove transfer-encoding as we're reading the whole content
-            if "transfer-encoding" in headers:
-                del headers["transfer-encoding"]
+            headers.pop("transfer-encoding", None)
 
             # Suggest a filename from the URL
             filename = url.split("/")[-1]
@@ -280,9 +280,13 @@ async def process_whatsapp_message(phone_number: str, text: str):
         result = await get_agent_response(text)
 
         if result.get("status") == "success":
-            file_url = result.get("file_url")
-            book_name = result.get("book_name")
-            extension = result.get("extension")
+            file_url: str = result.get("file_url", "")
+            book_name: str = result.get("book_name", "Unknown")
+            extension: str = result.get("extension", "pdf")
+
+            if not file_url:
+                await send_whatsapp_text(phone_number, "Sorry, no download URL was found.")
+                return
 
             # Check file size if possible, or attempt to download and send
             # For simplicity, we'll try to get the headers first to check size
@@ -346,5 +350,5 @@ async def send_whatsapp_document(to: str, document_url: str, filename: str):
         await client.post(url, headers=headers, json=payload)
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import uvicorn  # type: ignore
+    uvicorn.run(app, host="0.0.0.0", port=8001)
