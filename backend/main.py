@@ -16,6 +16,8 @@ import re
 load_dotenv()
 
 def extract_json_from_response(text: str) -> dict:
+    if text is None:
+        raise ValueError("Response text is None")
     try:
         return json.loads(text)
     except json.JSONDecodeError:
@@ -140,7 +142,7 @@ Return JSON ONLY, with a single key "search_query" containing your query."""
 
     # Step 1: Get search query
     payload1 = {
-        "model": "meta-llama/llama-3-8b-instruct:free",
+        "model": "openrouter/auto",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
@@ -154,7 +156,10 @@ Return JSON ONLY, with a single key "search_query" containing your query."""
             resp1.raise_for_status()
             res1_json = resp1.json()
 
-            content1 = res1_json['choices'][0]['message']['content']
+            content1 = res1_json['choices'][0]['message'].get('content')
+            if not content1:
+                 # Fallback for models that might put json in a different key or return empty string
+                 content1 = "{}"
             query_data = extract_json_from_response(content1)
             search_query = query_data.get("search_query", user_message)
         except Exception as e:
@@ -184,7 +189,7 @@ Or if not found:
 }}"""
 
     payload2 = {
-        "model": "meta-llama/llama-3-8b-instruct:free",
+        "model": "openrouter/auto",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
@@ -200,8 +205,12 @@ Or if not found:
             resp2.raise_for_status()
             res2_json = resp2.json()
 
-            content2 = res2_json['choices'][0]['message']['content']
+            content2 = res2_json['choices'][0]['message'].get('content')
+            if not content2:
+                 content2 = "{}"
             final_data = extract_json_from_response(content2)
+            if not final_data or "status" not in final_data:
+                return {"status": "fail", "reason": "Could not extract download link from search results."}
             return final_data
         except Exception as e:
             content2_preview = locals().get('content2', 'No content')
