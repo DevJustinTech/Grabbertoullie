@@ -1,0 +1,10 @@
+{
+  "source_directories": [
+    "."
+  ],
+  "ignore_all_errors": [
+    "c:\\Users\\HP\\.antigravity\\Grabbertoullie\\backend\\main.py",
+    "backend/main.py",
+    "."
+  ]
+}

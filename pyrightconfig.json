@@ -1,0 +1,12 @@
+{
+    "pythonPlatform": "Windows",
+    "venvPath": "c:\\Users\\HP\\.antigravity\\Grabbertoullie",
+    "venv": ".venv",
+    "executionEnvironments": [
+        {
+            "root": "backend",
+            "venv": ".venv",
+            "venvPath": "c:\\Users\\HP\\.antigravity\\Grabbertoullie\\backend"
+        }
+    ]
+}

@@ -28,7 +28,7 @@ export default function Home() {
     setLoading(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
       const res = await fetch(`${apiUrl}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -62,7 +62,7 @@ export default function Home() {
 
   const handleDownload = (url: string) => {
     // Navigate to the download proxy endpoint to avoid CORS issues and force download
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
     window.location.href = `${apiUrl}/api/download?url=${encodeURIComponent(url)}`;
   };
 
