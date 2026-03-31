@@ -32,7 +32,10 @@ def extract_json_from_response(text: str) -> dict:
         end = text.rfind('}')
         if start != -1 and end != -1 and end > start:
             try:
-                return json.loads(text[start:end+1])
+                # Pylance/Pyright in this version has a false positive with string slices and slice types.
+                # Extracting it to a string var with a type ignore fixes the red squiggly.
+                substr: str = text[start:end+1]  # type: ignore
+                return json.loads(substr)
             except json.JSONDecodeError:
                 pass
         raise ValueError(f"Could not parse JSON from response")
