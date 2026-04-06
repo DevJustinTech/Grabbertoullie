@@ -13,7 +13,9 @@ from urllib.parse import urlparse
 from dotenv import load_dotenv  # type: ignore
 import re
 
-load_dotenv()
+# explicitly load the .env from the backend/ directory so it is found regardless of cwd
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(backend_dir, ".env"))
 
 def extract_json_from_response(text: str) -> dict:
     if text is None:
@@ -82,7 +84,7 @@ async def search_web(query: str) -> dict:  # type: ignore[return]
         'X-API-KEY': SERPER_API_KEY,
         'Content-Type': 'application/json'
     }
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
         try:
             response = await client.post(url, headers=headers, content=payload)
             response.raise_for_status()
@@ -101,20 +103,22 @@ async def get_agent_response(user_message: str) -> dict:  # type: ignore[return]
             "extension": "pdf"
         }
 
-    system_prompt = """You are a File Retrieval Agent. Your job is to find a DIRECT download URL for a book (PDF or EPUB) based on a user's command.
+    system_prompt = """You are a highly advanced Book File Retrieval Agent. Your ultimate goal is to generate extremely thorough, advanced search queries (Google dorks) to pinpoint direct download URLs for books (PDF or EPUB), avoiding any generic or spammy sources.
 
 COMMAND PARSING:
 - Command format: "grab [Book Name] [filetype]"
-- Normalize messy spacing or underscores in book names
-- Extract the book name and desired file type (pdf or epub)
+- Normalize syntax, ignore misspellings or awkward phrasing.
+- Extract the exact book name and desired file type (pdf or epub).
 
-SEARCH STRATEGY:
-- Formulate search queries to find direct download links, such as:
-  1. "[book name] [filetype] direct download"
-  2. "[book name] filetype:[filetype] site:archive.org OR site:gutenberg.org"
-  3. "[book name] [filetype] free download"
-- Prioritize results from: Project Gutenberg, Internet Archive, Open Library, academic repositories
-- AVOID: Amazon, Google Books, Scribd, preview/landing pages
+ADVANCED SEARCH STRATEGY:
+- Generate heavily optimized Google dork queries to find globally exposed files, bypassing paywalls and landing pages.
+- MUST Use advanced search operators. Examples to choose from:
+  1. `intitle:"index of" "[book name]" (pdf|epub)`
+  2. `"[book name]" filetype:[filetype] (site:archive.org/download OR site:vk.com OR site:github.com)`
+  3. `"[book name]" ext:[filetype] "direct download"`
+  4. `site:gutenberg.org/files "[book name]" [filetype]`
+- AVOID generic terms like "buy", "kindle", "amazon", "goodreads", "scribd".
+- Prioritize Open Directory listings, Archive.org raw file directories, and raw file hosting links.
 
 OUTPUT FORMAT:
 You must output ONLY valid JSON:
@@ -131,8 +135,8 @@ If no direct download found:
  "reason": "Explanation of why no link was found"
 }
 
-First, decide on a search query to use, then I will provide the search results.
-Return JSON ONLY, with a single key "search_query" containing your query."""
+First, decide on the ABSOLUTE BEST advanced search query to use, then I will provide the search results.
+Return JSON ONLY, with a single key "search_query" containing your exact advanced query string."""
 
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -142,7 +146,7 @@ Return JSON ONLY, with a single key "search_query" containing your query."""
 
     # Step 1: Get search query
     payload1 = {
-        "model": "openrouter/auto",
+        "model": "openrouter/free",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
@@ -150,7 +154,7 @@ Return JSON ONLY, with a single key "search_query" containing your query."""
         "response_format": {"type": "json_object"}
     }
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
         try:
             resp1 = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload1)
             resp1.raise_for_status()
@@ -171,25 +175,29 @@ Return JSON ONLY, with a single key "search_query" containing your query."""
     search_results = await search_web(search_query)
 
     # Step 3: Parse results
-    parse_prompt = f"""Here are the search results for the query "{search_query}":
+    parse_prompt = f"""Here are the raw search results from the advanced query "{search_query}":
 {json.dumps(search_results, indent=2)}
 
-Analyze these results and extract a direct download URL.
-Remember to output ONLY valid JSON in this format:
+Deeply and thoroughly analyze these search results. Look aggressively for direct .pdf or .epub URLs.
+- Look closely inside snippet texts, URLs, and titles.
+- If a result links to archive.org/details/..., deduce and construct the archive.org/download/... link instead!
+- Ignore generic landing pages. Only extract the absolute direct file URL.
+
+Remember to output ONLY valid JSON in this precise format:
 {{
  "status": "success",
  "book_name": "Corrected Book Title",
- "file_url": "https://direct-download-url.com/file.pdf",
+ "file_url": "https://url.com/direct_file.pdf",
  "extension": "pdf"
 }}
-Or if not found:
+Or if TRULY not found after exhaustive check:
 {{
  "status": "fail",
- "reason": "Explanation"
+ "reason": "Explanation of the failure."
 }}"""
 
     payload2 = {
-        "model": "openrouter/auto",
+        "model": "openrouter/free",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
@@ -199,7 +207,7 @@ Or if not found:
         "response_format": {"type": "json_object"}
     }
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
         try:
             resp2 = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload2)
             resp2.raise_for_status()
@@ -210,12 +218,15 @@ Or if not found:
                  content2 = "{}"
             final_data = extract_json_from_response(content2)
             if not final_data or "status" not in final_data:
-                return {"status": "fail", "reason": "Could not extract download link from search results."}
+                return {"status": "fail", "reason": f"AI output was missing 'status' key. Data: {final_data}"}
             return final_data
+        except httpx.HTTPStatusError as e:
+            logger.error(f"OpenRouter HTTP Error: {e}")
+            return {"status": "fail", "reason": f"OpenRouter API Error: {e.response.status_code} {e.response.text}"}
         except Exception as e:
-            content2_preview = locals().get('content2', 'No content')
-            logger.error(f"Failed to parse final JSON from AI: {e}. Raw content: {content2_preview}")
-            return {"status": "fail", "reason": "Could not extract download link from search results."}
+            res_preview = locals().get('res2_json', 'No JSON parsed')
+            logger.error(f"Failed to parse final JSON from AI: {repr(e)}. Raw res2_json: {res_preview}")
+            return {"status": "fail", "reason": f"Internal Processing Error: {repr(e)}"}
 
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
@@ -328,7 +339,7 @@ async def process_whatsapp_message(phone_number: str, text: str):
             # Check file size if possible, or attempt to download and send
             # For simplicity, we'll try to get the headers first to check size
             try:
-                async with httpx.AsyncClient() as client:
+                async with httpx.AsyncClient(timeout=60.0) as client:
                     head_resp = await client.head(file_url, follow_redirects=True)
                     content_length = int(head_resp.headers.get("content-length", 0))
 
@@ -365,7 +376,7 @@ async def send_whatsapp_text(to: str, text: str):
         "type": "text",
         "text": {"body": text}
     }
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
         await client.post(url, headers=headers, json=payload)
 
 async def send_whatsapp_document(to: str, document_url: str, filename: str):
@@ -383,7 +394,7 @@ async def send_whatsapp_document(to: str, document_url: str, filename: str):
             "filename": filename
         }
     }
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
         await client.post(url, headers=headers, json=payload)
 
 if __name__ == "__main__":
