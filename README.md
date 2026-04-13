@@ -1,11 +1,11 @@
 # WhatsApp Book Retrieval Web Agent
 
-This project is a rewrite of an n8n WhatsApp agent into a full-stack Next.js and FastAPI web application. It functions as a chatbot that takes a command (e.g., "grab The Great Gatsby pdf"), uses OpenRouter LLM to parse the intent, searches the web via Serper API for a direct download link, and provides the file to the user.
+This project is a rewrite of an n8n WhatsApp agent into a full-stack Next.js and FastAPI web application. It functions as a chatbot that takes a command (e.g., "grab The Great Gatsby pdf"), uses Groq LLM to parse the intent, searches the web via Serper API for a direct download link, and provides the file to the user.
 
 ## Features
 - **Web Interface:** A sleek chat interface built with Next.js and Tailwind CSS.
 - **WhatsApp Integration:** Built-in webhooks to connect to Meta's WhatsApp Cloud API. Automatically sends small files (<45MB) as direct document messages, or provides the URL for larger files.
-- **AI-Powered Search:** Leverages OpenRouter and Serper to intelligently find direct file links (PDF/EPUB) from sites like Internet Archive and Gutenberg.
+- **AI-Powered Search:** Leverages Groq and Serper to intelligently find direct file links (PDF/EPUB) from sites like Internet Archive and Gutenberg.
 - **SSRF Protection:** A secure backend proxy to download files safely, bypassing CORS issues on the frontend.
 
 ## Getting Started
@@ -28,7 +28,7 @@ Navigate to the `backend` folder and copy `.env.example` to `.env`:
 cd backend
 cp .env.example .env
 ```
-Fill in your API keys in `backend/.env`. (OpenRouter and Serper API keys are required for full functionality).
+Fill in your API keys in `backend/.env`. (Groq and Serper API keys are required for full functionality).
 
 **3. Run the Backend (FastAPI)**
 ```bash
