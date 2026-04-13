@@ -57,7 +57,7 @@ app.add_middleware(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN")
@@ -95,7 +95,7 @@ async def search_web(query: str) -> dict:  # type: ignore[return]
 
 async def get_agent_response(user_message: str) -> dict:  # type: ignore[return]
     # Fallback response for missing API keys
-    if not OPENROUTER_API_KEY or OPENROUTER_API_KEY == "your_openrouter_api_key_here":
+    if not GROQ_API_KEY or GROQ_API_KEY == "your_groq_api_key_here":
         return {
             "status": "success",
             "book_name": "Sample Book (Mock Result)",
@@ -139,14 +139,13 @@ First, decide on the ABSOLUTE BEST advanced search query to use, then I will pro
 Return JSON ONLY, with a single key "search_query" containing your exact advanced query string."""
 
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "HTTP-Referer": "http://localhost:8001",
+        "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
 
     # Step 1: Get search query
     payload1 = {
-        "model": "openrouter/free",
+        "model": "llama-3.3-70b-versatile",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
@@ -156,7 +155,7 @@ Return JSON ONLY, with a single key "search_query" containing your exact advance
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:
-            resp1 = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload1)
+            resp1 = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload1)
             resp1.raise_for_status()
             res1_json = resp1.json()
 
@@ -197,7 +196,7 @@ Or if TRULY not found after exhaustive check:
 }}"""
 
     payload2 = {
-        "model": "openrouter/free",
+        "model": "llama-3.3-70b-versatile",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
@@ -209,7 +208,7 @@ Or if TRULY not found after exhaustive check:
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:
-            resp2 = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload2)
+            resp2 = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload2)
             resp2.raise_for_status()
             res2_json = resp2.json()
 
@@ -221,8 +220,8 @@ Or if TRULY not found after exhaustive check:
                 return {"status": "fail", "reason": f"AI output was missing 'status' key. Data: {final_data}"}
             return final_data
         except httpx.HTTPStatusError as e:
-            logger.error(f"OpenRouter HTTP Error: {e}")
-            return {"status": "fail", "reason": f"OpenRouter API Error: {e.response.status_code} {e.response.text}"}
+            logger.error(f"Groq HTTP Error: {e}")
+            return {"status": "fail", "reason": f"Groq API Error: {e.response.status_code} {e.response.text}"}
         except Exception as e:
             res_preview = locals().get('res2_json', 'No JSON parsed')
             logger.error(f"Failed to parse final JSON from AI: {repr(e)}. Raw res2_json: {res_preview}")
