@@ -1,0 +1,23 @@
+INFO:     Started server process [148472]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     127.0.0.1:56008 - "OPTIONS /api/chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56018 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:services.pipeline:Starting parallel search for: Dune Frank Herbert
+INFO:services.search:Searching Standard Ebooks for title='Dune'
+INFO:services.search:Searching Open Library for title='Dune', author='Frank Herbert'
+INFO:services.search:Searching Serper fallback for query='Dune Frank Herbert'
+INFO:httpx:HTTP Request: GET https://standardebooks.org/ebooks?query=Dune "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://openlibrary.org/search.json?title=Dune&author=Frank+Herbert&limit=5 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://google.serper.dev/search "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:49954 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:services.pipeline:Starting parallel search for: Dune Frank Herbert
+INFO:services.search:Searching Standard Ebooks for title='Dune'
+INFO:services.search:Searching Open Library for title='Dune', author='Frank Herbert'
+INFO:services.search:Searching Serper fallback for query='Dune Frank Herbert'
+INFO:httpx:HTTP Request: GET https://standardebooks.org/ebooks?query=Dune "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://openlibrary.org/search.json?title=Dune&author=Frank+Herbert&limit=5 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://google.serper.dev/search "HTTP/1.1 200 OK"

@@ -1,6 +1,16 @@
 # pyre-ignore-all-errors
 from fastapi import FastAPI, Request, HTTPException, Response  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
+from fastapi.responses import StreamingResponse # type: ignore
+from services.llm import extract_metadata_from_query
+from services.pipeline import (
+    perform_parallel_search,
+    score_and_rank_results,
+    format_best_result,
+    needs_disambiguation,
+    generate_disambiguation_payload
+)
+import asyncio
 from pydantic import BaseModel  # type: ignore
 import httpx  # type: ignore
 import os
@@ -227,10 +237,78 @@ Or if TRULY not found after exhaustive check:
             logger.error(f"Failed to parse final JSON from AI: {repr(e)}. Raw res2_json: {res_preview}")
             return {"status": "fail", "reason": f"Internal Processing Error: {repr(e)}"}
 
+async def chat_stream_generator(user_message: str):
+    """Generates SSE events for the chat endpoint."""
+
+    # We yield directly from the main generator function
+    # so we don't nest generators improperly.
+
+    try:
+        # Step 1: Extract Metadata
+        yield f"data: {json.dumps({'type': 'status', 'message': 'Understanding your request...'})}\n\n"
+        await asyncio.sleep(0.05)
+        metadata = await extract_metadata_from_query(user_message, GROQ_API_KEY)
+
+        # Step 2: Parallel Search
+        sources_str = "Open Library, Standard Ebooks, and Serper"
+        yield f"data: {json.dumps({'type': 'status', 'message': f'Searching {sources_str}...'})}\n\n"
+        await asyncio.sleep(0.05)
+        results = await perform_parallel_search(metadata, SERPER_API_KEY)
+
+        if not results:
+            yield f"data: {json.dumps({'type': 'status', 'message': 'No results found across any sources.'})}\n\n"
+            await asyncio.sleep(0.05)
+            final = {"type": "result", "data": {"status": "fail", "reason": "No results found from any search source."}}
+            yield f"data: {json.dumps(final)}\n\n"
+            return
+
+        yield f"data: {json.dumps({'type': 'status', 'message': f'Found {len(results)} potential matches. Scoring and ranking...'})}\n\n"
+        await asyncio.sleep(0.05)
+
+        # Step 3: Score and Rank
+        ranked = score_and_rank_results(results, metadata)
+
+        # Step 4: Check for Disambiguation
+        if needs_disambiguation(ranked, metadata):
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Multiple matches found. Need clarification.'})}\n\n"
+            await asyncio.sleep(0.05)
+            payload = generate_disambiguation_payload(ranked)
+            if payload.get("candidates"):
+                final = {"type": "disambiguation", "data": payload}
+                yield f"data: {json.dumps(final)}\n\n"
+                return
+
+        # Step 5: Final Result
+        best_result = ranked[0]
+        if best_result.get("_score", 0) < 0:
+             yield f"data: {json.dumps({'type': 'status', 'message': 'Matches found, but none met the criteria.'})}\n\n"
+             await asyncio.sleep(0.05)
+             final = {"type": "result", "data": {"status": "fail", "reason": "Found matches, but they didn't match the requested format or quality criteria."}}
+             yield f"data: {json.dumps(final)}\n\n"
+             return
+
+        final_data = format_best_result(best_result, metadata.get("format", "pdf"))
+        yield f"data: {json.dumps({'type': 'status', 'message': 'Found the best match! Preparing download...'})}\n\n"
+        await asyncio.sleep(0.05)
+        final = {"type": "result", "data": final_data}
+        yield f"data: {json.dumps(final)}\n\n"
+
+    except Exception as e:
+        logger.error(f"Error in chat stream: {e}", exc_info=True)
+        final = {"type": "result", "data": {"status": "fail", "reason": f"An error occurred: {str(e)}"}}
+        yield f"data: {json.dumps(final)}\n\n"
+
+
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
-    result = await get_agent_response(request.message)
-    return result
+    return StreamingResponse(
+        chat_stream_generator(request.message),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
 
 def is_valid_url(url: str) -> Tuple[bool, str]:
     try:
