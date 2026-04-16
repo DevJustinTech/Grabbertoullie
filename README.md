@@ -1,9 +1,9 @@
-# WhatsApp Book Retrieval Web Agent
+# Book Retrieval Agent
 
-This project is a rewrite of an n8n WhatsApp agent into a full-stack Next.js and FastAPI web application. It functions as a chatbot that takes a command (e.g., "grab The Great Gatsby pdf"), uses Groq LLM to parse the intent, searches the web via Serper API for a direct download link, and provides the file to the user.
+This project is a full-stack Next.js and FastAPI web application that functions as a book retrieval agent. It can be accessed via a sleek web UI or integrated with WhatsApp. The agent takes a command (e.g., "grab The Great Gatsby pdf"), uses the Groq LLM to parse the intent, searches the web via the Serper API for a direct download link, and provides the file to the user.
 
 ## Features
-- **Web Interface:** A sleek chat interface built with Next.js and Tailwind CSS.
+- **Web Interface:** A sleek, modern chat interface built with Next.js and Tailwind CSS.
 - **WhatsApp Integration:** Built-in webhooks to connect to Meta's WhatsApp Cloud API. Automatically sends small files (<45MB) as direct document messages, or provides the URL for larger files.
 - **AI-Powered Search:** Leverages Groq and Serper to intelligently find direct file links (PDF/EPUB) from sites like Internet Archive and Gutenberg.
 - **SSRF Protection:** A secure backend proxy to download files safely, bypassing CORS issues on the frontend.
@@ -28,7 +28,9 @@ Navigate to the `backend` folder and copy `.env.example` to `.env`:
 cd backend
 cp .env.example .env
 ```
-Fill in your API keys in `backend/.env`. (Groq and Serper API keys are required for full functionality).
+Fill in your API keys in `backend/.env`. (Groq and Serper API keys are required for full functionality. WhatsApp variables are required for the WhatsApp webhook integration).
+
+If you are changing the backend URL, you may also need to set `NEXT_PUBLIC_API_URL` in the frontend environment variables.
 
 **3. Run the Backend (FastAPI)**
 ```bash
@@ -47,7 +49,9 @@ cd frontend
 npm install
 npm run dev
 ```
-The frontend will run on `http://localhost:3001`.
+The frontend will run on `http://localhost:3001` (or whichever port Next.js allocates if 3000/3001 are in use).
 
 ### Usage
-Open your browser and navigate to `http://localhost:3001`. Type a command in the chat to start searching for books!
+Open your browser and navigate to the frontend URL (e.g. `http://localhost:3001`). Type a command in the chat to start searching for books!
+
+To use the WhatsApp integration, ensure your webhook is configured to point to `http://<your_backend_domain>/webhook` and your Meta Developer app has the necessary tokens configured in your backend `.env`.
