@@ -4,3 +4,4 @@ httpx
 python-dotenv
 pydantic
 beautifulsoup4
+curl_cffi
