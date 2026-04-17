@@ -1,7 +1,14 @@
 import asyncio
 import logging
 from typing import Dict, Any, List
-from .search import search_open_library, search_standard_ebooks, search_serper_fallback
+from .search import (
+    search_open_library,
+    search_standard_ebooks,
+    search_project_gutenberg,
+    search_semantic_scholar,
+    search_annas_archive,
+    search_serper_fallback
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +28,9 @@ async def perform_parallel_search(metadata: Dict[str, Any], serper_api_key: str)
     results = await asyncio.gather(
         search_standard_ebooks(title),
         search_open_library(title, author),
+        search_project_gutenberg(title, author),
+        search_semantic_scholar(title, author),
+        search_annas_archive(title, author),
         search_serper_fallback(original_query, serper_api_key),
         return_exceptions=True
     )
