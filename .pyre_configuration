@@ -2,6 +2,10 @@
   "source_directories": [
     "."
   ],
+  "search_path": [
+    "backend",
+    "c:/Users/HP/.antigravity/Grabbertoullie/backend/.venv/Lib/site-packages"
+  ],
   "ignore_all_errors": [
     "c:\\Users\\HP\\.antigravity\\Grabbertoullie\\backend\\main.py",
     "backend/main.py",
