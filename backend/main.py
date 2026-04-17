@@ -1,15 +1,10 @@
-# pyre-ignore-all-errors
+# pyre-ignore-all-errors - triggered reload
 from fastapi import FastAPI, Request, HTTPException, Response  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 from fastapi.responses import StreamingResponse # type: ignore
 from services.llm import extract_metadata_from_query
-from services.pipeline import (
-    perform_parallel_search,
-    score_and_rank_results,
-    format_best_result,
-    needs_disambiguation,
-    generate_disambiguation_payload
-)
+from services.pipeline import perform_parallel_search, score_and_rank_results, format_best_result, needs_disambiguation, generate_disambiguation_payload  # pyre-ignore
+
 import asyncio
 from pydantic import BaseModel  # type: ignore
 import httpx  # type: ignore
