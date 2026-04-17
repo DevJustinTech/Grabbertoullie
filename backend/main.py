@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request, HTTPException, Response  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 from fastapi.responses import StreamingResponse # type: ignore
 from services.llm import extract_metadata_from_query
-from services.pipeline import perform_parallel_search, score_and_rank_results, format_best_result, needs_disambiguation, generate_disambiguation_payload  # pyre-ignore
+from services.pipeline import perform_parallel_search, score_and_rank_results, format_best_result, needs_disambiguation, generate_disambiguation_payload, validate_url  # pyre-ignore
 
 import asyncio
 from pydantic import BaseModel  # type: ignore
@@ -273,20 +273,90 @@ async def chat_stream_generator(user_message: str):
                 yield f"data: {json.dumps(final)}\n\n"
                 return
 
-        # Step 5: Final Result
-        best_result = ranked[0]
-        if best_result.get("_score", 0) < 0:
+        # Step 5: Validate Top Results
+        top_candidates = [r for r in ranked if r.get("_score", 0) >= 0][:3]
+        if not top_candidates:
              yield f"data: {json.dumps({'type': 'status', 'message': 'Matches found, but none met the criteria.'})}\n\n"
              await asyncio.sleep(0.05)
              final = {"type": "result", "data": {"status": "fail", "reason": "Found matches, but they didn't match the requested format or quality criteria."}}
              yield f"data: {json.dumps(final)}\n\n"
              return
 
-        final_data = format_best_result(best_result, metadata.get("format", "pdf"))
-        yield f"data: {json.dumps({'type': 'status', 'message': 'Found the best match! Preparing download...'})}\n\n"
+        yield f"data: {json.dumps({'type': 'status', 'message': 'Verifying download links...'})}\n\n"
         await asyncio.sleep(0.05)
-        final = {"type": "result", "data": final_data}
-        yield f"data: {json.dumps(final)}\n\n"
+
+        target_format = metadata.get("format", "pdf")
+
+        async def validate_candidate(candidate):
+            # Try to validate the preferred format link first
+            if target_format == "pdf" and candidate.get("pdf_url"):
+                if await validate_url(candidate["pdf_url"]):
+                    return candidate, "pdf"
+            elif target_format == "epub" and candidate.get("epub_url"):
+                if await validate_url(candidate["epub_url"]):
+                    return candidate, "epub"
+            elif target_format == "any":
+                if candidate.get("epub_url") and await validate_url(candidate["epub_url"]):
+                    return candidate, "epub"
+                if candidate.get("pdf_url") and await validate_url(candidate["pdf_url"]):
+                    return candidate, "pdf"
+
+            # Fallback to the other format if it exists and we haven't checked it
+            if candidate.get("pdf_url") and target_format != "pdf" and target_format != "any":
+                if await validate_url(candidate["pdf_url"]):
+                    return candidate, "pdf"
+            if candidate.get("epub_url") and target_format != "epub" and target_format != "any":
+                if await validate_url(candidate["epub_url"]):
+                    return candidate, "epub"
+
+            return None, None
+
+        # Validate concurrently
+        validation_results = await asyncio.gather(*[validate_candidate(c) for c in top_candidates])
+
+        best_result = None
+        best_format = None
+        for candidate, fmt in validation_results:
+            if candidate is not None:
+                best_result = candidate
+                best_format = fmt
+                break
+
+        if best_result:
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Link verified ✓'})}\n\n"
+            await asyncio.sleep(0.05)
+
+            # Temporarily update format just for formatting if it's "any"
+            temp_format = target_format
+            if temp_format == "any":
+                temp_format = best_format
+
+            final_data = format_best_result(best_result, temp_format)
+            final = {"type": "result", "data": final_data}
+            yield f"data: {json.dumps(final)}\n\n"
+        else:
+            # Fallback to Anna's Archive search
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Could not verify a direct link. Providing a fallback search link...'})}\n\n"
+            await asyncio.sleep(0.05)
+
+            title = metadata.get("title", "")
+            author = metadata.get("author", "")
+            query_str = f"{title} {author}".strip().replace(' ', '+')
+            fallback_url = f"https://annas-archive.gl/search?q={query_str}"
+
+            book_name = title
+            if author:
+                book_name += f" by {author}"
+
+            final_data = {
+                "status": "success",
+                "book_name": book_name,
+                "file_url": fallback_url,
+                "extension": target_format if target_format != "any" else "epub",
+                "source": "Anna's Archive Fallback"
+            }
+            final = {"type": "result", "data": final_data}
+            yield f"data: {json.dumps(final)}\n\n"
 
     except Exception as e:
         logger.error(f"Error in chat stream: {e}", exc_info=True)
