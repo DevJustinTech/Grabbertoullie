@@ -245,7 +245,7 @@ async def search_annas_archive(title: str, author: str = "") -> List[Dict[str, A
         return results
 
     query_str = " ".join(query_parts)
-    url = f"https://annas-archive.gl/search?q={query_str.replace(' ', '+')}"
+    url = f"https://annas-archive.org/search?q={query_str.replace(' ', '+')}"
 
     # We use curl_cffi to bypass basic anti-bot checks on Anna's Archive
     try:
