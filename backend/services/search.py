@@ -244,7 +244,7 @@ async def search_annas_archive(title: str, author: str = "") -> List[Dict[str, A
         return results
 
     query_str = " ".join(query_parts)
-    url = f"https://annas-archive.gl/search?q={query_str.replace(' ', '+')}"
+    url = f"https://annas-archive.org/search?q={query_str.replace(' ', '+')}"
 
     try:
         from curl_cffi.requests import AsyncSession # type: ignore
