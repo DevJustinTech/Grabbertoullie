@@ -336,25 +336,13 @@ async def chat_stream_generator(user_message: str):
             final = {"type": "result", "data": final_data}
             yield f"data: {json.dumps(final)}\n\n"
         else:
-            # Fallback to Anna's Archive search
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Could not verify a direct link. Providing a fallback search link...'})}\n\n"
+            # Explicitly fail if no direct link could be verified
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Could not verify any direct links.'})}\n\n"
             await asyncio.sleep(0.05)
 
-            title = metadata.get("title", "")
-            author = metadata.get("author", "")
-            query_str = f"{title} {author}".strip().replace(' ', '+')
-            fallback_url = f"https://annas-archive.gl/search?q={query_str}"
-
-            book_name = title
-            if author:
-                book_name += f" by {author}"
-
             final_data = {
-                "status": "success",
-                "book_name": book_name,
-                "file_url": fallback_url,
-                "extension": target_format if target_format != "any" else "epub",
-                "source": "Anna's Archive Fallback"
+                "status": "fail",
+                "reason": "Could not find a direct download link for this book."
             }
             final = {"type": "result", "data": final_data}
             yield f"data: {json.dumps(final)}\n\n"
