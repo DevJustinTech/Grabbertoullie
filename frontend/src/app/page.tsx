@@ -102,7 +102,7 @@ export default function Home() {
                 setLoading(false);
                 setStreamStatus("");
               } else if (data.type === "disambiguation") {
-                 setMessages((prev) => [
+                setMessages((prev) => [
                   ...prev,
                   { role: "bot", content: "Found multiple matches. Which one did you mean?", result: data.data },
                 ]);
@@ -134,7 +134,7 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen bg-white text-zinc-900 font-sans selection:bg-zinc-200">
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-zinc-100 px-6 py-4 flex items-center justify-center">
-        <h1 className="text-lg font-semibold tracking-tight text-zinc-800">Book Finder</h1>
+        <h1 className="text-lg font-semibold tracking-tight text-zinc-800">Grabbertoullie</h1>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 pb-32 pt-8">
@@ -156,16 +156,14 @@ export default function Home() {
           {messages.map((msg, idx) => (
             <div
               key={idx}
-              className={`flex ${
-                msg.role === "user" ? "justify-end" : "justify-start"
-              } animate-in fade-in slide-in-from-bottom-2 duration-300`}
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
+                } animate-in fade-in slide-in-from-bottom-2 duration-300`}
             >
               <div
-                className={`max-w-[85%] sm:max-w-[75%] px-5 py-3.5 text-[15px] leading-relaxed flex flex-col gap-3 ${
-                  msg.role === "user"
+                className={`max-w-[85%] sm:max-w-[75%] px-5 py-3.5 text-[15px] leading-relaxed flex flex-col gap-3 ${msg.role === "user"
                     ? "bg-zinc-900 text-white rounded-3xl rounded-tr-sm"
                     : "bg-white border border-zinc-200 text-zinc-800 rounded-3xl rounded-tl-sm shadow-sm"
-                }`}
+                  }`}
               >
                 <p className="whitespace-pre-wrap">{msg.content}</p>
 
@@ -179,7 +177,7 @@ export default function Home() {
                       >
                         {candidate.title}
                         {candidate.source && (
-                           <span className="block text-xs font-normal text-zinc-500 mt-0.5">Source: {candidate.source}</span>
+                          <span className="block text-xs font-normal text-zinc-500 mt-0.5">Source: {candidate.source}</span>
                         )}
                       </button>
                     ))}

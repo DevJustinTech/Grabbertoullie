@@ -1,9 +1,9 @@
 import os
 import json
-import httpx
+import httpx # type: ignore
 import logging
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from bs4 import BeautifulSoup # type: ignore
 
 logger = logging.getLogger(__name__)
@@ -12,7 +12,6 @@ async def search_open_library(title: str, author: str = "") -> List[Dict[str, An
     logger.info(f"Searching Open Library for title='{title}', author='{author}'")
     results = []
 
-    # Construct query
     query = []
     if title:
         query.append(f"title={title.replace(' ', '+')}")
@@ -31,18 +30,13 @@ async def search_open_library(title: str, author: str = "") -> List[Dict[str, An
             data = resp.json()
 
             for doc in data.get("docs", []):
-                # Filter for things that might actually have full text or we can build an archive.org link
-                # Open Library items often link to archive.org
-
-                # Check if it has full text availability
                 has_fulltext = doc.get("has_fulltext", False)
-                ia_ids = doc.get("ia", []) # Internet Archive IDs
+                ia_ids = doc.get("ia", [])
 
                 if not ia_ids:
                     continue
 
-                for ia_id in ia_ids[:2]: # Take up to 2 IA IDs per doc
-                    # Construct direct PDF/EPUB links from Internet Archive
+                for ia_id in ia_ids[:2]:
                     pdf_url = f"https://archive.org/download/{ia_id}/{ia_id}.pdf"
                     epub_url = f"https://archive.org/download/{ia_id}/{ia_id}.epub"
 
@@ -53,7 +47,7 @@ async def search_open_library(title: str, author: str = "") -> List[Dict[str, An
                         "year": str(doc.get("first_publish_year", "")),
                         "pdf_url": pdf_url,
                         "epub_url": epub_url,
-                        "weight": 2 # Medium weight
+                        "weight": 2
                     })
 
     except Exception as e:
@@ -65,11 +59,6 @@ async def search_standard_ebooks(title: str) -> List[Dict[str, Any]]:
     logger.info(f"Searching Standard Ebooks for title='{title}'")
     results = []
 
-    # Standard Ebooks uses an OPDS feed that we can search
-    # url = f"https://standardebooks.org/opds/all?query={title}"
-    # However, standardebooks search through OPDS is sometimes tricky to parse without an XML parser.
-    # We can also scrape the regular search page which is often more reliable if OPDS isn't well documented.
-
     url = f"https://standardebooks.org/ebooks?query={title.replace(' ', '+')}"
 
     try:
@@ -77,13 +66,10 @@ async def search_standard_ebooks(title: str) -> List[Dict[str, Any]]:
             resp = await client.get(url)
             resp.raise_for_status()
 
-            # Simple parsing using string matching or we'll need bs4.
-            # Assuming bs4 is available as it's common. Let's add it to requirements if not.
             soup = BeautifulSoup(resp.text, 'html.parser')
-
             items = soup.select('ol.ebooks-list li')
-            for item in items[:5]: # Top 5
-                # Extract title and author
+
+            for item in items[:5]:
                 title_elem = item.select_one('p.title a')
                 author_elem = item.select_one('p.author a')
 
@@ -92,15 +78,10 @@ async def search_standard_ebooks(title: str) -> List[Dict[str, Any]]:
                 item_title = title_elem.text.strip()
                 item_author = author_elem.text.strip() if author_elem else ""
 
-                # The href usually looks like /ebooks/author-name/title-name
                 link = title_elem.get('href')
                 if not link: continue
 
-                # Standard Ebooks predictable download URLs:
-                # https://standardebooks.org/ebooks/author-name/title-name/downloads/author-name_title-name.epub
-                # We can just fetch the book page and extract the exact epub link.
                 book_url = f"https://standardebooks.org{link}"
-
                 book_resp = await client.get(book_url)
                 book_resp.raise_for_status()
                 book_soup = BeautifulSoup(book_resp.text, 'html.parser')
@@ -113,10 +94,10 @@ async def search_standard_ebooks(title: str) -> List[Dict[str, Any]]:
                         "source": "Standard Ebooks",
                         "title": item_title,
                         "author": item_author,
-                        "year": "", # Standard Ebooks are typically public domain / old
-                        "pdf_url": "", # They don't typically offer PDF
+                        "year": "",
+                        "pdf_url": "",
                         "epub_url": epub_url,
-                        "weight": 3 # Highest weight, beautifully formatted
+                        "weight": 3
                     })
 
     except Exception as e:
@@ -231,6 +212,24 @@ async def search_semantic_scholar(title: str, author: str = "") -> List[Dict[str
 
     return results
 
+
+def _title_matches(query_title: str, result_title: str) -> bool:
+    """
+    Returns True if result_title is a plausible match for query_title.
+    Requires at least 80% of the query title's words to appear in the result title.
+    This prevents e.g. an Italian press-summary PDF from matching "Somadina".
+    """
+    import re
+    if not query_title or not result_title:
+        return False
+    q_words = set(re.findall(r'\w+', query_title.lower()))
+    r_words = set(re.findall(r'\w+', result_title.lower()))
+    if not q_words:
+        return False
+    overlap = q_words & r_words
+    return len(overlap) / len(q_words) >= 0.8
+
+
 async def search_annas_archive(title: str, author: str = "") -> List[Dict[str, Any]]:
     logger.info(f"Searching Anna's Archive for title='{title}', author='{author}'")
     results = []
@@ -247,10 +246,8 @@ async def search_annas_archive(title: str, author: str = "") -> List[Dict[str, A
     query_str = " ".join(query_parts)
     url = f"https://annas-archive.gl/search?q={query_str.replace(' ', '+')}"
 
-    # We use curl_cffi to bypass basic anti-bot checks on Anna's Archive
     try:
-        from curl_cffi.requests import AsyncSession
-        from bs4 import BeautifulSoup
+        from curl_cffi.requests import AsyncSession # type: ignore
 
         async with AsyncSession(impersonate="chrome110") as s:
             resp = await s.get(url, timeout=15.0)
@@ -261,60 +258,93 @@ async def search_annas_archive(title: str, author: str = "") -> List[Dict[str, A
             soup = BeautifulSoup(resp.text, 'html.parser')
             md5_elements = soup.select('a[href^="/md5/"]')
 
-            md5_list = []
+            md5_list: List[Tuple[str, str, str]] = []
             seen_md5s = set()
 
             for a in md5_elements:
                 href = a.get('href')
-                if href:
-                    md5 = href.split('/')[-1]
-                    if md5 and md5 not in seen_md5s:
-                        seen_md5s.add(md5)
+                if not href:
+                    continue
 
-                        # Try to extract title/author from the element
-                        item_title = title
-                        item_author = author
+                md5 = href.split('/')[-1]
+                if not md5 or md5 in seen_md5s:
+                    continue
+                seen_md5s.add(md5)
 
-                        title_elem = a.select_one('h3')
-                        author_elem = a.select_one('.italic')
+                item_title = ""
+                item_author = ""
 
-                        if title_elem and title_elem.text.strip():
-                            item_title = title_elem.text.strip()
-                        if author_elem and author_elem.text.strip():
-                            item_author = author_elem.text.strip()
+                # Walk up to find the result card container
+                parent = a
+                for _ in range(4):
+                    if parent is None:
+                        break
+                    parent = getattr(parent, 'parent', None)
 
-                        md5_list.append((md5, item_title, item_author))
+                # Try multiple selector strategies to extract title/author
+                title_elem = (
+                    a.select_one('h3') or
+                    a.select_one('[class*="title"]') or
+                    a.select_one('div > div:first-child > div:first-child')
+                )
+                author_elem = (
+                    a.select_one('.italic') or
+                    a.select_one('[class*="author"]') or
+                    a.select_one('div > div:first-child > div:nth-child(2)')
+                )
+
+                if title_elem:
+                    item_title = title_elem.get_text(separator=" ", strip=True)
+                if author_elem:
+                    item_author = author_elem.get_text(separator=" ", strip=True)
+
+                # ── KEY FIX ──────────────────────────────────────────────────
+                # If we extracted a title but it doesn't match what we searched
+                # for, skip this MD5 entirely rather than resolving LibGen.
+                if item_title and not _title_matches(title, item_title):
+                    logger.debug(
+                        f"Skipping MD5 {md5}: scraped title '{item_title}' "
+                        f"doesn't match query title '{title}'"
+                    )
+                    continue
+                # ─────────────────────────────────────────────────────────────
+
+                # Fall back to the query values when we couldn't scrape anything
+                if not item_title:
+                    item_title = title
+                if not item_author:
+                    item_author = author
+
+                md5_list.append((md5, item_title, item_author))
 
             # Limit to top 3 unique MD5s to not hammer LibGen
-            for md5, item_title, item_author in md5_list[:3]:
-                # Now resolve against LibGen
+            for idx, (md5, item_title, item_author) in enumerate(md5_list):
+                if idx >= 3:
+                    break
+
                 lg_mirrors = [
                     f"http://libgen.is/search.php?req={md5}&column=md5",
                     f"http://libgen.rs/search.php?req={md5}&column=md5",
                     f"http://libgen.st/search.php?req={md5}&column=md5"
                 ]
 
-                direct_link = None
+                direct_link: Optional[str] = None
                 for lg_url in lg_mirrors:
                     try:
                         lg_resp = await s.get(lg_url, timeout=10.0)
                         if lg_resp.status_code == 200:
                             lg_soup = BeautifulSoup(lg_resp.text, 'html.parser')
-                            # Find standard libgen download mirrors
                             mirrors = lg_soup.select('a[title="libgen.li"], a[title="Gen.lib.rus.ec"], a[title="Cloudflare"]')
                             if mirrors:
                                 mirror_url = mirrors[0].get('href')
 
-                                # Fetch the actual download page
                                 mirror_resp = await s.get(mirror_url, timeout=10.0)
                                 mirror_soup = BeautifulSoup(mirror_resp.text, 'html.parser')
 
-                                # Extract GET link
                                 dl_links = mirror_soup.select('#download a, h2 a')
                                 for dl in dl_links:
                                     dl_href = dl.get('href')
                                     if dl_href:
-                                        # If it's a relative link, prepend the base URL
                                         if dl_href.startswith('/'):
                                             base_url = "/".join(mirror_url.split('/')[:3])
                                             direct_link = base_url + dl_href
@@ -324,13 +354,13 @@ async def search_annas_archive(title: str, author: str = "") -> List[Dict[str, A
                                         else:
                                             direct_link = dl_href
                                         break
-                            if direct_link:
-                                break # Found a link, stop trying mirrors
+                        if direct_link:
+                            break
                     except Exception as e:
                         logger.debug(f"LibGen mirror {lg_url} failed: {e}")
                         continue
 
-                if direct_link:
+                if isinstance(direct_link, str):
                     is_epub = "epub" in direct_link.lower()
                     is_pdf = "pdf" in direct_link.lower()
 
@@ -341,13 +371,14 @@ async def search_annas_archive(title: str, author: str = "") -> List[Dict[str, A
                         "year": "",
                         "pdf_url": direct_link if is_pdf or not is_epub else "",
                         "epub_url": direct_link if is_epub else "",
-                        "weight": 4 # High weight since it's a direct libgen match
+                        "weight": 4
                     })
 
     except Exception as e:
         logger.error(f"Anna's Archive search failed: {e}")
 
     return results
+
 
 async def search_serper_fallback(query: str, serper_api_key: str) -> List[Dict[str, Any]]:
     logger.info(f"Searching Serper fallback for query='{query}'")
@@ -356,7 +387,6 @@ async def search_serper_fallback(query: str, serper_api_key: str) -> List[Dict[s
     if not serper_api_key or serper_api_key == "your_serper_api_key_here":
         return results
 
-    # We construct a Dork just for the fallback
     dork_query = f'"{query}" (ext:pdf OR ext:epub) -site:pinterest.com'
 
     url = "https://google.serper.dev/search"
@@ -375,7 +405,6 @@ async def search_serper_fallback(query: str, serper_api_key: str) -> List[Dict[s
             for item in data.get("organic", [])[:5]:
                 link = item.get("link", "")
 
-                # We only want direct links in the fallback ideally, but the scorer will penalize non-direct links anyway.
                 if link.endswith('.pdf') or link.endswith('.epub'):
                     results.append({
                         "source": "Serper",
@@ -384,7 +413,7 @@ async def search_serper_fallback(query: str, serper_api_key: str) -> List[Dict[s
                         "year": "",
                         "pdf_url": link if link.endswith('.pdf') else "",
                         "epub_url": link if link.endswith('.epub') else "",
-                        "weight": 1 # Lowest weight
+                        "weight": 1
                     })
 
     except Exception as e:

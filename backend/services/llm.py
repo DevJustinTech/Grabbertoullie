@@ -2,6 +2,7 @@ import os
 import json
 import re
 import logging
+# pyre-ignore[21]
 import httpx
 from typing import Dict, Any
 
@@ -81,8 +82,8 @@ You must output ONLY valid JSON in this exact structure:
         "response_format": {"type": "json_object"}
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        try:
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
             resp.raise_for_status()
             res_json = resp.json()
@@ -103,12 +104,22 @@ You must output ONLY valid JSON in this exact structure:
 
             return metadata
 
-        except Exception as e:
-            logger.error(f"Failed to get metadata from AI: {e}")
-            return {
-                "title": user_message,
-                "author": "",
-                "year": "",
-                "format": "pdf",
-                "fuzzy": True
-            }
+    except Exception as e:
+        logger.error(f"Failed to get metadata from AI: {e}")
+        return {
+            "title": user_message,
+            "author": "",
+            "year": "",
+            "format": "pdf",
+            "fuzzy": True
+        }
+    
+    # Fallback to satisfy Pyre's path analysis of async with blocks
+    return {
+        "title": user_message,
+        "author": "",
+        "year": "",
+        "format": "pdf",
+        "fuzzy": True
+    }
+
