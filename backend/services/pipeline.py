@@ -1,7 +1,10 @@
 import asyncio
 import logging
+import re
 from typing import Dict, Any, List
+# pyre-ignore[21]
 import httpx
+# pyre-ignore[21]
 from .search import (
     search_open_library,
     search_standard_ebooks,
@@ -24,13 +27,15 @@ async def validate_url(url: str) -> bool:
         async with httpx.AsyncClient() as client:
             r = await client.head(url, timeout=5, follow_redirects=True)
             if r.status_code == 405:
-                # Some servers don't support HEAD, fallback to GET with stream=True
                 async with client.stream("GET", url, timeout=5, follow_redirects=True) as r_get:
                     return r_get.status_code < 400
             return r.status_code < 400
     except Exception as e:
         logger.debug(f"Validation failed for {url}: {e}")
         return False
+    
+    # Catch-all return to satisfy Pyre path analysis over async with
+    return False
 
 async def perform_parallel_search(metadata: Dict[str, Any], serper_api_key: str) -> List[Dict[str, Any]]:
     """
@@ -38,13 +43,10 @@ async def perform_parallel_search(metadata: Dict[str, Any], serper_api_key: str)
     """
     title = metadata.get("title", "")
     author = metadata.get("author", "")
-
-    # We always pass the full query to Serper as a fallback
     original_query = f"{title} {author}".strip()
 
     logger.info(f"Starting parallel search for: {original_query}")
 
-    # Run all searches concurrently
     results = await asyncio.gather(
         search_standard_ebooks(title),
         search_open_library(title, author),
@@ -56,8 +58,6 @@ async def perform_parallel_search(metadata: Dict[str, Any], serper_api_key: str)
     )
 
     all_results = []
-
-    # Flatten results and handle exceptions
     for i, res in enumerate(results):
         if isinstance(res, Exception):
             logger.error(f"Search source {i} failed with exception: {res}")
@@ -66,26 +66,51 @@ async def perform_parallel_search(metadata: Dict[str, Any], serper_api_key: str)
 
     return all_results
 
+
+def _title_similarity(a: str, b: str) -> float:
+    """
+    Returns the fraction of words in the shorter title that appear in the longer.
+    E.g. query="Somadina", result="Sommario Rassegna Stampa" → 0.0 (no overlap).
+    """
+    a_words = set(re.findall(r'\w+', a.lower()))
+    b_words = set(re.findall(r'\w+', b.lower()))
+    if not a_words or not b_words:
+        return 0.0
+    shorter = a_words if len(a_words) <= len(b_words) else b_words
+    longer  = b_words if len(a_words) <= len(b_words) else a_words
+    overlap = shorter & longer
+    return len(overlap) / len(shorter)
+
+
 def calculate_score(result: Dict[str, Any], metadata: Dict[str, Any]) -> int:
     """
     Scores a result based on how well it matches the metadata.
     """
     score = 0
-    target_title = metadata.get("title", "").lower()
+    target_title  = metadata.get("title",  "").lower()
     target_author = metadata.get("author", "").lower()
     target_format = metadata.get("format", "pdf").lower()
 
-    res_title = result.get("title", "").lower()
+    res_title  = result.get("title",  "").lower()
     res_author = result.get("author", "").lower()
 
     # Base weight from the source
     score += result.get("weight", 0) * 10
 
-    # Title match
-    if target_title and target_title in res_title:
-        score += 20
-        if target_title == res_title:
-            score += 10 # Bonus for exact match
+    # ── Title match (tightened) ───────────────────────────────────────────────
+    if target_title:
+        similarity = _title_similarity(target_title, res_title)
+        if similarity >= 0.8:
+            score += 20
+            if target_title == res_title:
+                score += 10  # Bonus for exact match
+        elif similarity >= 0.5:
+            score += 5       # Partial credit for a loose match
+        else:
+            # Hard penalty: result title shares almost nothing with the query.
+            # This is what catches the Italian PDF vs "Somadina" case.
+            score -= 40
+    # ─────────────────────────────────────────────────────────────────────────
 
     # Author match
     if target_author and target_author in res_author:
@@ -103,11 +128,11 @@ def calculate_score(result: Dict[str, Any], metadata: Dict[str, Any]) -> int:
     if has_target_format:
         score += 30
     else:
-        # Huge penalty if it doesn't have the desired format
         score -= 50
 
     result["_score"] = score
     return score
+
 
 def score_and_rank_results(results: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
@@ -116,9 +141,9 @@ def score_and_rank_results(results: List[Dict[str, Any]], metadata: Dict[str, An
     for res in results:
         calculate_score(res, metadata)
 
-    # Sort by score descending
     ranked = sorted(results, key=lambda x: x.get("_score", 0), reverse=True)
     return ranked
+
 
 def format_best_result(best: Dict[str, Any], target_format: str) -> Dict[str, Any]:
     """
@@ -130,7 +155,6 @@ def format_best_result(best: Dict[str, Any], target_format: str) -> Dict[str, An
         target_format = "epub" if best.get("epub_url") else "pdf"
 
     if not file_url:
-        # Fallback if preferred format missing but another exists
         file_url = best.get("epub_url") or best.get("pdf_url")
         target_format = "epub" if best.get("epub_url") else "pdf"
 
@@ -146,6 +170,7 @@ def format_best_result(best: Dict[str, Any], target_format: str) -> Dict[str, An
         "source": best.get("source")
     }
 
+
 def needs_disambiguation(ranked_results: List[Dict[str, Any]], metadata: Dict[str, Any]) -> bool:
     """
     Determines if we need to ask the user to clarify.
@@ -154,16 +179,12 @@ def needs_disambiguation(ranked_results: List[Dict[str, Any]], metadata: Dict[st
         return False
 
     if metadata.get("fuzzy", False):
-        # We need to make sure we actually have good distinct candidates
-        # to show. If we only have 1 good result, don't bother disambiguating.
         good_candidates = [r for r in ranked_results if r.get("_score", 0) > 0]
         if len(good_candidates) > 1:
             return True
 
-    # Also disambiguate if the top scores are very close and not perfectly matched
-    # Or if there are multiple very similar items.
-    # For now, relying on the 'fuzzy' flag from LLM is the safest bet.
     return False
+
 
 def generate_disambiguation_payload(ranked_results: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
@@ -176,10 +197,9 @@ def generate_disambiguation_payload(ranked_results: List[Dict[str, Any]]) -> Dic
         if res.get("_score", 0) < 0:
             continue
 
-        # Create a unique identifier to avoid duplicates in the UI
-        title = res.get("title", "").strip()
+        title  = res.get("title",  "").strip()
         author = res.get("author", "").strip()
-        year = res.get("year", "")
+        year   = res.get("year",   "")
 
         sig = f"{title}|{author}".lower()
         if sig in seen:
@@ -193,16 +213,16 @@ def generate_disambiguation_payload(ranked_results: List[Dict[str, Any]]) -> Dic
             display_text += f" - {author}"
 
         candidates.append({
-            "title": display_text,
-            "raw_title": title,
+            "title":      display_text,
+            "raw_title":  title,
             "raw_author": author,
-            "source": res.get("source")
+            "source":     res.get("source")
         })
 
         if len(candidates) >= 4:
             break
 
     return {
-        "status": "disambiguation_required",
+        "status":     "disambiguation_required",
         "candidates": candidates
     }

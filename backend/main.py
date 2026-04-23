@@ -274,7 +274,7 @@ async def chat_stream_generator(user_message: str):
                 return
 
         # Step 5: Validate Top Results
-        top_candidates = [r for r in ranked if r.get("_score", 0) >= 0][:3]
+        top_candidates = [r for r in ranked if r.get("_score", 0) >= 0][:3]  # type: ignore
         if not top_candidates:
              yield f"data: {json.dumps({'type': 'status', 'message': 'Matches found, but none met the criteria.'})}\n\n"
              await asyncio.sleep(0.05)
@@ -316,7 +316,8 @@ async def chat_stream_generator(user_message: str):
 
         best_result = None
         best_format = None
-        for candidate, fmt in validation_results:
+        # pyright has a bug where it fails to evaluate `await asyncio.gather(*[...])` as unwrapping Coroutines
+        for candidate, fmt in validation_results:  # type: ignore
             if candidate is not None:
                 best_result = candidate
                 best_format = fmt
