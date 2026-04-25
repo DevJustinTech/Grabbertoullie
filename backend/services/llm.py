@@ -50,8 +50,12 @@ async def extract_metadata_from_query(user_message: str, groq_api_key: str) -> D
     system_prompt = """You are a precise Book Metadata Extraction Agent.
 Your job is to analyze a user's request for a book and extract structured metadata.
 
+CRITICAL INSTRUCTIONS:
+- You MUST rigorously separate the book title from the author name. If the user says "Harry Potter by JK Rowling", the title is EXACTLY "Harry Potter" and the author is "JK Rowling". Do not include "by JK Rowling" in the title field!
+- If the user provides a series name but no specific book, treat the series name as the title.
+
 Extract the following fields:
-- title: The title of the book.
+- title: The EXACT title of the book, stripped of the author's name and unnecessary punctuation.
 - author: The author of the book (if mentioned).
 - year: The publication year (if mentioned).
 - format: The preferred file format ('pdf', 'epub', or 'any'). Defaults to 'pdf' if unclear.
