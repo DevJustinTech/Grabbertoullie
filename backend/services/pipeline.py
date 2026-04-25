@@ -4,6 +4,7 @@ import re
 from typing import Dict, Any, List
 # pyre-ignore[21]
 import httpx
+from rapidfuzz import fuzz
 # pyre-ignore[21]
 from .search import (
     search_open_library,
@@ -69,17 +70,22 @@ async def perform_parallel_search(metadata: Dict[str, Any], serper_api_key: str)
 
 def _title_similarity(a: str, b: str) -> float:
     """
-    Returns the fraction of words in the shorter title that appear in the longer.
-    E.g. query="Somadina", result="Sommario Rassegna Stampa" → 0.0 (no overlap).
+    Returns a similarity score between 0.0 and 1.0 using rapidfuzz token_sort_ratio.
+    This handles misspellings, slightly different wording, and ignores word order.
     """
-    a_words = set(re.findall(r'\w+', a.lower()))
-    b_words = set(re.findall(r'\w+', b.lower()))
-    if not a_words or not b_words:
+    if not a or not b:
         return 0.0
-    shorter = a_words if len(a_words) <= len(b_words) else b_words
-    longer  = b_words if len(a_words) <= len(b_words) else a_words
-    overlap = shorter & longer
-    return len(overlap) / len(shorter)
+    return fuzz.token_sort_ratio(a.lower(), b.lower()) / 100.0
+
+
+def _author_similarity(a: str, b: str) -> float:
+    """
+    Returns a similarity score between 0.0 and 1.0 using rapidfuzz token_set_ratio.
+    This is great for matching "J.K. Rowling" with "Rowling, J.K." or "Joanne K Rowling".
+    """
+    if not a or not b:
+        return 0.0
+    return fuzz.token_set_ratio(a.lower(), b.lower()) / 100.0
 
 
 def calculate_score(result: Dict[str, Any], metadata: Dict[str, Any]) -> int:
@@ -100,21 +106,31 @@ def calculate_score(result: Dict[str, Any], metadata: Dict[str, Any]) -> int:
     # ── Title match (tightened) ───────────────────────────────────────────────
     if target_title:
         similarity = _title_similarity(target_title, res_title)
-        if similarity >= 0.8:
-            score += 20
+        if similarity >= 0.85:
+            score += 30
             if target_title == res_title:
-                score += 10  # Bonus for exact match
-        elif similarity >= 0.5:
-            score += 5       # Partial credit for a loose match
+                score += 15  # Bonus for exact string match
+        elif similarity >= 0.65:
+            score += 10       # Partial credit for a loose match
         else:
             # Hard penalty: result title shares almost nothing with the query.
-            # This is what catches the Italian PDF vs "Somadina" case.
-            score -= 40
+            score -= 50
     # ─────────────────────────────────────────────────────────────────────────
 
     # Author match
-    if target_author and target_author in res_author:
-        score += 15
+    if target_author:
+        if res_author:
+            author_sim = _author_similarity(target_author, res_author)
+            if author_sim >= 0.8:
+                score += 25
+            elif author_sim >= 0.5:
+                score += 5
+            else:
+                # Severe penalty if the authors are clearly different
+                score -= 60
+        else:
+            # Slight penalty if user asked for an author but result has none
+            score -= 10
 
     # Format match (crucial)
     has_target_format = False
@@ -174,14 +190,27 @@ def format_best_result(best: Dict[str, Any], target_format: str) -> Dict[str, An
 def needs_disambiguation(ranked_results: List[Dict[str, Any]], metadata: Dict[str, Any]) -> bool:
     """
     Determines if we need to ask the user to clarify.
+    Triggers if the query was marked fuzzy, OR if the top candidates
+    have very close scores (indicating ambiguity).
     """
     if not ranked_results:
         return False
 
+    good_candidates = [r for r in ranked_results if r.get("_score", 0) > 0]
+
+    if len(good_candidates) <= 1:
+        return False
+
     if metadata.get("fuzzy", False):
-        good_candidates = [r for r in ranked_results if r.get("_score", 0) > 0]
-        if len(good_candidates) > 1:
-            return True
+        return True
+
+    # If not fuzzy, but the top two candidates are very close in score, we should disambiguate
+    top_score = good_candidates[0].get("_score", 0)
+    runner_up_score = good_candidates[1].get("_score", 0)
+
+    # If the second best is within 15 points of the best, it's ambiguous
+    if top_score - runner_up_score <= 15:
+        return True
 
     return False
 
