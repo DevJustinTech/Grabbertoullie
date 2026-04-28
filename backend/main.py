@@ -404,12 +404,15 @@ async def download_endpoint(url: str):
             # Remove transfer-encoding as we're reading the whole content
             headers.pop("transfer-encoding", None)
 
-            # Suggest a filename from the URL
-            filename = url.split("/")[-1]
-            if not filename:
-                filename = "downloaded_file"
-
-            headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+            # Suggest a filename from the URL or Content-Disposition
+            content_disposition = response.headers.get("content-disposition")
+            if content_disposition:
+                headers["Content-Disposition"] = content_disposition
+            else:
+                filename = url.split("/")[-1]
+                if not filename or "?" in filename:
+                    filename = "downloaded_file"
+                headers["Content-Disposition"] = f'attachment; filename="{filename}"'
 
             return Response(content=response.content, status_code=response.status_code, headers=headers)
     except Exception as e:
