@@ -244,18 +244,44 @@ async def search_annas_archive(title: str, author: str = "") -> List[Dict[str, A
         return results
 
     query_str = " ".join(query_parts)
-    url = f"https://annas-archive.org/search?q={query_str.replace(' ', '+')}"
+    encoded_query = query_str.replace(' ', '+')
+
+    # Try mirrors in order until one responds
+    ANNAS_MIRRORS = [
+        "https://annas-archive.se",
+        "https://annas-archive.li",
+        "https://annas-archive.gl",
+        "https://annas-archive.org",
+    ]
 
     try:
         from curl_cffi.requests import AsyncSession # type: ignore
 
         async with AsyncSession(impersonate="chrome110") as s:
-            resp = await s.get(url, timeout=15.0)
-            if resp.status_code != 200:
-                logger.warning(f"Anna's Archive returned status {resp.status_code}")
-                return results
 
-            soup = BeautifulSoup(resp.text, 'html.parser')
+            # ── Pick the first responsive mirror ─────────────────────────────
+            resp_text: Any = None
+            used_mirror: Any = None
+            for mirror in ANNAS_MIRRORS:
+                url = f"{mirror}/search?q={encoded_query}"
+                try:
+                    r = await s.get(url, timeout=15.0)
+                    if r.status_code == 200:
+                        resp_text = r.text
+                        used_mirror = mirror
+                        logger.info(f"Anna's Archive mirror OK: {mirror}")
+                        break
+                    else:
+                        logger.warning(f"Anna's Archive mirror {mirror} returned {r.status_code}, trying next...")
+                except Exception as mirror_err:
+                    logger.warning(f"Anna's Archive mirror {mirror} failed: {mirror_err}, trying next...")
+
+            if not resp_text:
+                logger.error("All Anna's Archive mirrors failed.")
+                return results
+            # ─────────────────────────────────────────────────────────────────
+
+            soup = BeautifulSoup(resp_text, 'html.parser')
             md5_elements = soup.select('a[href^="/md5/"]')
 
             md5_list: List[Tuple[str, str, str]] = []
@@ -275,11 +301,11 @@ async def search_annas_archive(title: str, author: str = "") -> List[Dict[str, A
                 item_author = ""
 
                 # Walk up to find the result card container
-                parent = a
+                parent: Any = a
                 for _ in range(4):
                     if parent is None:
                         break
-                    parent = getattr(parent, 'parent', None)
+                    parent = parent.parent  # pyre-ignore[16]
 
                 # Try multiple selector strategies to extract title/author
                 title_elem = (

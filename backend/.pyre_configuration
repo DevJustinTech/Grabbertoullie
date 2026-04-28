@@ -4,7 +4,7 @@
   ],
   "search_path": [
     ".",
-    "c:/Users/HP/.antigravity/Grabbertoullie/backend/.venv/Lib/site-packages"
+    "c:/Users/HP/.antigravity/Grabbertoullie/.venv/Lib/site-packages"
   ],
   "ignore_all_errors": [
     "c:\\Users\\HP\\.antigravity\\Grabbertoullie\\backend\\main.py",
