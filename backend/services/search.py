@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import httpx # type: ignore
 import logging
@@ -7,6 +8,8 @@ from typing import Dict, Any, List, Optional, Tuple
 from bs4 import BeautifulSoup # type: ignore
 
 logger = logging.getLogger(__name__)
+
+WORD_RE = re.compile(r'\w+')
 
 async def search_open_library(title: str, author: str = "") -> List[Dict[str, Any]]:
     logger.info(f"Searching Open Library for title='{title}', author='{author}'")
@@ -219,11 +222,10 @@ def _title_matches(query_title: str, result_title: str) -> bool:
     Requires at least 80% of the query title's words to appear in the result title.
     This prevents e.g. an Italian press-summary PDF from matching "Somadina".
     """
-    import re
     if not query_title or not result_title:
         return False
-    q_words = set(re.findall(r'\w+', query_title.lower()))
-    r_words = set(re.findall(r'\w+', result_title.lower()))
+    q_words = set(WORD_RE.findall(query_title.lower()))
+    r_words = set(WORD_RE.findall(result_title.lower()))
     if not q_words:
         return False
     overlap = q_words & r_words
