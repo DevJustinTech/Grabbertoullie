@@ -380,10 +380,14 @@ def is_valid_url(url: str) -> Tuple[bool, str]:
         # This prevents accessing localhost or internal networks.
         # Since resolving every time can be complex asynchronously, we block obvious local IPs.
         try:
-            ip = socket.gethostbyname(hostname)
-            ip_obj = ipaddress.ip_address(ip)
-            if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_multicast or ip_obj.is_reserved or ip_obj.is_link_local:
-                return False, "Invalid or restricted URL domain/IP."
+            # Prevent SSRF: Resolve to IP and block private/loopback/restricted IPs.
+            # Use getaddrinfo to support both IPv4 and IPv6 to prevent IPv6 bypasses.
+            addr_info = socket.getaddrinfo(hostname, None)
+            for res in addr_info:
+                ip = res[4][0]
+                ip_obj = ipaddress.ip_address(ip)
+                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_multicast or ip_obj.is_reserved or ip_obj.is_link_local:
+                    return False, "Invalid or restricted URL domain/IP."
         except socket.gaierror:
             pass  # DNS resolution failed, might still be valid or handled by httpx later
 
