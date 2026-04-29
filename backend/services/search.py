@@ -365,10 +365,12 @@ async def search_annas_archive(title: str, author: str = "") -> List[Dict[str, A
                                         dl_href = dl.get('href')
                                         if dl_href:
                                             if dl_href.startswith('/'):
-                                                base_url = "/".join(l_href.split('/')[:3])
+                                                parts = l_href.split('/')
+                                                base_url = f"{parts[0]}//{parts[2]}"
                                                 direct_link = base_url + dl_href
                                             elif not dl_href.startswith('http'):
-                                                base_url = "/".join(l_href.split('/')[:3])
+                                                parts = l_href.split('/')
+                                                base_url = f"{parts[0]}//{parts[2]}"
                                                 direct_link = base_url + "/" + dl_href
                                             else:
                                                 direct_link = dl_href
@@ -385,10 +387,12 @@ async def search_annas_archive(title: str, author: str = "") -> List[Dict[str, A
                                         dl_href = dl.get('href')
                                         if dl_href:
                                             if dl_href.startswith('/'):
-                                                base_url = "/".join(l_href.split('/')[:3])
+                                                parts = l_href.split('/')
+                                                base_url = f"{parts[0]}//{parts[2]}"
                                                 direct_link = base_url + dl_href
                                             elif not dl_href.startswith('http'):
-                                                base_url = "/".join(l_href.split('/')[:3])
+                                                parts = l_href.split('/')
+                                                base_url = f"{parts[0]}//{parts[2]}"
                                                 direct_link = base_url + "/" + dl_href
                                             else:
                                                 direct_link = dl_href

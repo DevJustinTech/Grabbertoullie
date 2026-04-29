@@ -4,6 +4,7 @@ import re
 from typing import Dict, Any, List
 # pyre-ignore[21]
 import httpx
+# pyre-ignore[21]
 from rapidfuzz import fuzz
 # pyre-ignore[21]
 from .search import (
