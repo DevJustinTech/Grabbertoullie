@@ -1,18 +1,12 @@
 import asyncio
 import logging
-import re
 from typing import Dict, Any, List
 # pyre-ignore[21]
 import httpx
 from rapidfuzz import fuzz
 # pyre-ignore[21]
 from .search import (
-    search_open_library,
-    search_standard_ebooks,
-    search_project_gutenberg,
-    search_semantic_scholar,
-    search_annas_archive,
-    search_serper_fallback
+    search_annas_archive
 )
 
 logger = logging.getLogger(__name__)
@@ -38,23 +32,17 @@ async def validate_url(url: str) -> bool:
     # Catch-all return to satisfy Pyre path analysis over async with
     return False
 
-async def perform_parallel_search(metadata: Dict[str, Any], serper_api_key: str) -> List[Dict[str, Any]]:
+async def perform_parallel_search(metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Executes searches across multiple sources in parallel.
     """
     title = metadata.get("title", "")
     author = metadata.get("author", "")
-    original_query = f"{title} {author}".strip()
 
-    logger.info(f"Starting parallel search for: {original_query}")
+    logger.info(f"Starting parallel search for: {title} {author}")
 
     results = await asyncio.gather(
-        # search_standard_ebooks(title),
-        # search_open_library(title, author),
-        # search_project_gutenberg(title, author),
-        # search_semantic_scholar(title, author),
         search_annas_archive(title, author),
-        # search_serper_fallback(original_query, serper_api_key),
         return_exceptions=True
     )
 
