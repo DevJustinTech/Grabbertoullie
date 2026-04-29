@@ -8,6 +8,8 @@ from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
+JSON_BLOCK_RE = re.compile(r'```(?:json)?\s*(.*?)\s*```', re.DOTALL)
+
 def extract_json_from_response(text: str) -> dict:
     if text is None:
         raise ValueError("Response text is None")
@@ -15,7 +17,7 @@ def extract_json_from_response(text: str) -> dict:
         return json.loads(text)
     except json.JSONDecodeError:
         # Try to find a JSON block using regex
-        match = re.search(r'```(?:json)?\s*(.*?)\s*```', text, re.DOTALL)
+        match = JSON_BLOCK_RE.search(text)
         if match:
             try:
                 return json.loads(match.group(1))
