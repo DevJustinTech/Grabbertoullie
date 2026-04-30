@@ -238,7 +238,7 @@ def _parse_search(html: str, file_type: str) -> list[dict]:
 
 # ── Step 2 — Book detail page ─────────────────────────────────────────────────
 
-async def get_book_info(book_url: str) -> dict:
+async def get_book_info(book_url: str) -> dict:  # pyre-ignore
     """
     Fetch a book's /md5/ detail page and return a BookDetail dict.
     Also automatically resolves the mirror page to get the final download URL.
