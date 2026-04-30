@@ -1,14 +1,14 @@
 """
-zlib.py  —  Z-Library scraper for Grabbertoullie
+zlib_scraper.py  —  Z-Library scraper for Grabbertoullie
 ---------------------------------------------------------------
 Drop into your backend/ folder.
 
 CLI test:
-    python zlib.py "Atomic Habits" --ext pdf --full
-    python zlib.py "Atomic Habits" --ext epub --full
+    python zlib_scraper.py "Atomic Habits" --ext pdf --full
+    python zlib_scraper.py "Atomic Habits" --ext epub --full
 
 From your FastAPI agent:
-    from zlib import find_best_download, search_books, get_book_info
+    from zlib_scraper import find_best_download, search_books, get_book_info
 
     book = await find_best_download("Atomic Habits", file_type="pdf")
     if book and book["download_url"]:
