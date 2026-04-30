@@ -22,8 +22,8 @@ import argparse
 from dataclasses import dataclass, asdict
 from typing import Optional
 
-from playwright.async_api import async_playwright
-from bs4 import BeautifulSoup
+from playwright.async_api import async_playwright  # pyre-ignore
+from bs4 import BeautifulSoup  # pyre-ignore
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -196,7 +196,7 @@ def _parse_search(html: str, base_url: str, file_type: str) -> list[dict]:
 
 # ── Step 2 — Book detail page ─────────────────────────────────────────────────
 
-async def get_book_info(book_url: str) -> dict:
+async def get_book_info(book_url: str) -> dict:  # pyre-ignore
     """
     Fetch a book's detail page and return a BookDetail dict.
     Automatically grabs the download URL.
