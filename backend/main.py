@@ -22,6 +22,8 @@ import re
 backend_dir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(backend_dir, ".env"))
 
+JSON_BLOCK_RE = re.compile(r'```(?:json)?\s*(.*?)\s*```', re.DOTALL)
+
 def extract_json_from_response(text: str) -> dict:
     if text is None:
         raise ValueError("Response text is None")
@@ -29,7 +31,7 @@ def extract_json_from_response(text: str) -> dict:
         return json.loads(text)
     except json.JSONDecodeError:
         # Try to find a JSON block using regex
-        match = re.search(r'```(?:json)?\s*(.*?)\s*```', text, re.DOTALL)
+        match = JSON_BLOCK_RE.search(text)
         if match:
             try:
                 return json.loads(match.group(1))
@@ -378,10 +380,14 @@ def is_valid_url(url: str) -> Tuple[bool, str]:
         # This prevents accessing localhost or internal networks.
         # Since resolving every time can be complex asynchronously, we block obvious local IPs.
         try:
-            ip = socket.gethostbyname(hostname)
-            ip_obj = ipaddress.ip_address(ip)
-            if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_multicast or ip_obj.is_reserved or ip_obj.is_link_local:
-                return False, "Invalid or restricted URL domain/IP."
+            # Prevent SSRF: Resolve to IP and block private/loopback/restricted IPs.
+            # Use getaddrinfo to support both IPv4 and IPv6 to prevent IPv6 bypasses.
+            addr_info = socket.getaddrinfo(hostname, None)
+            for res in addr_info:
+                ip = res[4][0]
+                ip_obj = ipaddress.ip_address(ip)
+                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_multicast or ip_obj.is_reserved or ip_obj.is_link_local:
+                    return False, "Invalid or restricted URL domain/IP."
         except socket.gaierror:
             pass  # DNS resolution failed, might still be valid or handled by httpx later
 

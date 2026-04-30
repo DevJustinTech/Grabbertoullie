@@ -10,6 +10,18 @@ async def test_ssrf_protection():
         assert response.status_code == 400
         assert "Invalid or restricted URL" in response.json()["detail"]
 
+        response = await ac.get("/api/download?url=http://localhost/internal")
+        assert response.status_code == 400
+        assert "Invalid or restricted URL" in response.json()["detail"]
+
+        response = await ac.get("/api/download?url=http://[::1]/internal")
+        assert response.status_code == 400
+        assert "Invalid or restricted URL" in response.json()["detail"]
+
+        response = await ac.get("/api/download?url=http://[0:0:0:0:0:0:0:1]/internal")
+        assert response.status_code == 400
+        assert "Invalid or restricted URL" in response.json()["detail"]
+
         response = await ac.get("/api/download?url=http://169.254.169.254/latest/meta-data/")
         assert response.status_code == 400
         assert "Invalid or restricted URL" in response.json()["detail"]
