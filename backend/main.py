@@ -247,7 +247,7 @@ async def chat_stream_generator(user_message: str):
         metadata = await extract_metadata_from_query(user_message, GROQ_API_KEY)
 
         # Step 2: Parallel Search
-        sources_str = "Anna's Archive"
+        sources_str = "Z-Library"
         yield f"data: {json.dumps({'type': 'status', 'message': f'Searching {sources_str}...'})}\n\n"
         await asyncio.sleep(0.05)
         results = await perform_parallel_search(metadata)
