@@ -6,6 +6,7 @@ import logging
 import asyncio
 from typing import Dict, Any, List, Optional, Tuple
 from bs4 import BeautifulSoup # type: ignore
+from zlib_scraper import search_books, get_book_info
 
 logger = logging.getLogger(__name__)
 
@@ -232,8 +233,8 @@ def _title_matches(query_title: str, result_title: str) -> bool:
     return len(overlap) / len(q_words) >= 0.8
 
 
-async def search_annas_archive(title: str, author: str = "") -> List[Dict[str, Any]]:
-    logger.info(f"Searching Anna's Archive for title='{title}', author='{author}'")
+async def search_zlibrary(title: str, author: str = "", fmt: str = "any") -> List[Dict[str, Any]]:
+    logger.info(f"Searching Z-Library for title='{title}', author='{author}', format='{fmt}'")
     results = []
 
     query_parts = []
@@ -246,206 +247,42 @@ async def search_annas_archive(title: str, author: str = "") -> List[Dict[str, A
         return results
 
     query_str = " ".join(query_parts)
-    encoded_query = query_str.replace(' ', '+')
 
-    ANNAS_MIRROR = "https://annas-archive.gl"
+    file_type = ""
+    if fmt and fmt.lower() in ["pdf", "epub"]:
+        file_type = fmt.lower()
 
     try:
-        from playwright.async_api import async_playwright
+        zlib_results = await search_books(query_str, file_type=file_type)
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                extra_http_headers={"Accept-Language": "en-US,en;q=0.9"}
-            )
-            page = await context.new_page()
+        for item in zlib_results[:3]: # Limit to top 3 to avoid excessive scraping
+            link = item.get("link")
+            if not link:
+                continue
 
-            url = f"{ANNAS_MIRROR}/search?q={encoded_query}"
             try:
-                r = await page.goto(url, wait_until="domcontentloaded", timeout=15000)
-                if r and r.status >= 400:
-                    logger.error(f"Anna's Archive returned {r.status}")
-                    return results
-                resp_text = await page.content()
+                info = await get_book_info(link)
+                download_url = info.get("download_url")
+
+                if download_url:
+                    item_title = item.get("title", "")
+                    item_author = item.get("author", "")
+                    item_format = item.get("format", "").lower()
+
+                    results.append({
+                        "source": "Z-Library",
+                        "title": item_title,
+                        "author": item_author,
+                        "year": "",
+                        "pdf_url": download_url if item_format == "pdf" else "",
+                        "epub_url": download_url if item_format == "epub" else "",
+                        "weight": 4
+                    })
             except Exception as e:
-                logger.error(f"Anna's Archive search request failed: {e}")
-                return results
-            finally:
-                await browser.close()
-
-            soup = BeautifulSoup(resp_text, 'html.parser')
-            md5_elements = soup.select('a[href^="/md5/"]')
-
-            md5_list: List[Tuple[str, str, str]] = []
-            seen_md5s = set()
-
-            for a in md5_elements:
-                href = a.get('href')
-                if not href:
-                    continue
-
-                md5 = href.split('/')[-1]
-                if not md5 or md5 in seen_md5s:
-                    continue
-                seen_md5s.add(md5)
-
-                item_title = ""
-                item_author = ""
-
-                # Try to extract title/author
-                title_elem = (
-                    a.select_one('h3') or
-                    a.select_one('[class*="title"]') or
-                    a.select_one('div > div:first-child > div:first-child')
-                )
-                author_elem = (
-                    a.select_one('.italic') or
-                    a.select_one('[class*="author"]') or
-                    a.select_one('div > div:first-child > div:nth-child(2)')
-                )
-
-                if title_elem:
-                    item_title = title_elem.get_text(separator=" ", strip=True)
-                if author_elem:
-                    item_author = author_elem.get_text(separator=" ", strip=True)
-
-                if item_title and not _title_matches(title, item_title):
-                    logger.debug(f"Skipping MD5 {md5}: scraped title '{item_title}' doesn't match query title '{title}'")
-                    continue
-
-                if not item_title:
-                    item_title = title
-                if not item_author:
-                    item_author = author
-
-                md5_list.append((md5, item_title, item_author))
-
-            # Limit to top 3 unique MD5s
-            for idx, (md5, item_title, item_author) in enumerate(md5_list):
-                if idx >= 3:
-                    break
-
-                # Fetch the MD5 detail page
-                md5_url = f"{ANNAS_MIRROR}/md5/{md5}"
-                try:
-                    md5_resp = await s.get(md5_url, timeout=15.0)
-                    if md5_resp.status_code != 200:
-                        continue
-
-                    md5_soup = BeautifulSoup(md5_resp.text, 'html.parser')
-
-                    direct_link: Optional[str] = None
-                    possible_links: List[str] = []
-
-                    # Look for external mirrors like libgen or IPFS
-                    for link in md5_soup.find_all('a'):
-                        l_href = link.get('href', '')
-                        if l_href == '#' or not l_href:
-                            continue
-
-                        l_text = link.text.strip().lower()
-
-                        if 'libgen.li' in l_text and 'ads.php' in l_href:
-                            possible_links.append(l_href)
-                        elif ('libgen.is' in l_text or 'libgen.rs' in l_text) and 'md5=' in l_href:
-                            possible_links.append(l_href)
-                        elif 'ipfs' in l_text and l_href.startswith('/ipfs_downloads/'):
-                            possible_links.append(f"{ANNAS_MIRROR}{l_href}")
-                        elif l_href.startswith('ipfs://'):
-                            possible_links.append(l_href)
-
-                    # Sort possible links to prioritize libgen
-                    def link_priority(url: str) -> int:
-                        if 'libgen' in url:
-                            return 0
-                        if 'ipfs_downloads' in url:
-                            return 1
-                        return 2
-
-                    possible_links.sort(key=link_priority)
-
-                    for l_href in possible_links:
-                        if 'libgen.li' in l_href:
-                            try:
-                                lg_resp = await s.get(l_href, timeout=10.0)
-                                if lg_resp.status_code == 200:
-                                    lg_soup = BeautifulSoup(lg_resp.text, 'html.parser')
-                                    dl_links = lg_soup.select('#download a, h2 a, a[href*="get.php"]')
-                                    for dl in dl_links:
-                                        dl_href = dl.get('href')
-                                        if dl_href:
-                                            if dl_href.startswith('/'):
-                                                parts = l_href.split('/')
-                                                base_url = f"{parts[0]}//{parts[2]}"
-                                                direct_link = base_url + dl_href
-                                            elif not dl_href.startswith('http'):
-                                                parts = l_href.split('/')
-                                                base_url = f"{parts[0]}//{parts[2]}"
-                                                direct_link = base_url + "/" + dl_href
-                                            else:
-                                                direct_link = dl_href
-                                            break
-                            except Exception as e:
-                                logger.debug(f"Failed to fetch libgen.li from {l_href}: {e}")
-                        elif 'libgen.is' in l_href or 'libgen.rs' in l_href:
-                            try:
-                                lg_resp = await s.get(l_href, timeout=10.0)
-                                if lg_resp.status_code == 200:
-                                    lg_soup = BeautifulSoup(lg_resp.text, 'html.parser')
-                                    dl_links = lg_soup.select('#download a, h2 a')
-                                    for dl in dl_links:
-                                        dl_href = dl.get('href')
-                                        if dl_href:
-                                            if dl_href.startswith('/'):
-                                                parts = l_href.split('/')
-                                                base_url = f"{parts[0]}//{parts[2]}"
-                                                direct_link = base_url + dl_href
-                                            elif not dl_href.startswith('http'):
-                                                parts = l_href.split('/')
-                                                base_url = f"{parts[0]}//{parts[2]}"
-                                                direct_link = base_url + "/" + dl_href
-                                            else:
-                                                direct_link = dl_href
-                                            break
-                            except Exception as e:
-                                logger.debug(f"Failed to fetch libgen mirror from {l_href}: {e}")
-                        elif l_href.startswith('ipfs://'):
-                            cid = l_href.replace('ipfs://', '')
-                            direct_link = f"https://ipfs.io/ipfs/{cid}"
-                        else:
-                            # It's an Anna's Archive IPFS download page, which might have direct links
-                            direct_link = l_href
-
-                        if direct_link:
-                            break
-
-                    if isinstance(direct_link, str):
-                        is_epub = "epub" in direct_link.lower() or "epub" in md5_resp.text.lower()
-                        is_pdf = "pdf" in direct_link.lower() or "pdf" in md5_resp.text.lower()
-
-                        # Try to guess extension from the Anna's Archive page if not in URL
-                        if not is_epub and not is_pdf:
-                            if "epub" in item_title.lower() or "epub" in item_author.lower():
-                                is_epub = True
-                            else:
-                                is_pdf = True
-
-                        results.append({
-                            "source": "Anna's Archive",
-                            "title": item_title,
-                            "author": item_author,
-                            "year": "",
-                            "pdf_url": direct_link if is_pdf or not is_epub else "",
-                            "epub_url": direct_link if is_epub else "",
-                            "weight": 4
-                        })
-
-                except Exception as e:
-                    logger.debug(f"Failed to process MD5 {md5}: {e}")
+                logger.error(f"Failed to get info for Z-Library book '{item.get('title')}': {e}")
 
     except Exception as e:
-        logger.error(f"Anna's Archive search failed: {e}")
+        logger.error(f"Z-Library search failed: {e}")
 
     return results
 
