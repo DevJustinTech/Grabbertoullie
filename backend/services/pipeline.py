@@ -7,7 +7,7 @@ import httpx
 from rapidfuzz import fuzz
 # pyre-ignore[21]
 from .search import (
-    search_annas_archive
+    search_zlibrary
 )
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ async def perform_parallel_search(metadata: Dict[str, Any]) -> List[Dict[str, An
     logger.info(f"Starting parallel search for: {title} {author}")
 
     results = await asyncio.gather(
-        search_annas_archive(title, author),
+        search_zlibrary(title, author, metadata.get("format", "any")),
         return_exceptions=True
     )
 
