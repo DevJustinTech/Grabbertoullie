@@ -23,7 +23,7 @@ from collections import defaultdict
 from dataclasses import dataclass, asdict
 from typing import Optional
 
-from curl_cffi.requests import AsyncSession, RequestsError  # pyre-ignore
+from playwright.async_api import async_playwright  # pyre-ignore
 from bs4 import BeautifulSoup
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -81,10 +81,6 @@ def _clean(text: Optional[str]) -> str:
     return (text or "").strip()
 
 
-def _make_client() -> AsyncSession:
-    return AsyncSession(impersonate="chrome", headers=HEADERS, timeout=30)
-
-
 # ── Step 1 — Search ───────────────────────────────────────────────────────────
 
 async def search_books(
@@ -111,19 +107,25 @@ async def search_books(
     else:
         url = f"{BASE_URL}/search?index=&q={q}&content={content}&ext={file_type}&sort={sort}"
 
-    async with _make_client() as client:
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(
+            user_agent=HEADERS["User-Agent"],
+            extra_http_headers={"Accept-Language": HEADERS["Accept-Language"]}
+        )
+        page = await context.new_page()
+
         try:
-            resp = await client.get(url)
-            resp.raise_for_status()
-        except RequestsError as exc:
-            raise ConnectionError(
-                f"Cannot reach Anna's Archive ({BASE_URL}). "
-                f"Try a different BASE_URL mirror. ({exc})"
-            ) from exc
+            response = await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            if response and response.status >= 400:
+                raise ConnectionError(f"HTTP {response.status} reaching Anna's Archive")
+            html = await page.content()
         except Exception as exc:
             raise ConnectionError(f"Error reaching Anna's Archive: {exc}") from exc
+        finally:
+            await browser.close()
 
-    return _parse_search(resp.text, file_type)
+    return _parse_search(html, file_type)
 
 
 def _parse_search(html: str, file_type: str) -> list[dict]:
@@ -241,22 +243,31 @@ async def get_book_info(book_url: str) -> dict:
     Fetch a book's /md5/ detail page and return a BookDetail dict.
     Also automatically resolves the mirror page to get the final download URL.
     """
-    async with _make_client() as client:
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(
+            user_agent=HEADERS["User-Agent"],
+            extra_http_headers={"Accept-Language": HEADERS["Accept-Language"]}
+        )
+        page = await context.new_page()
+
         try:
-            resp = await client.get(book_url)
-            resp.raise_for_status()
-        except RequestsError as exc:
-            raise ConnectionError(f"Cannot reach Anna's Archive: {exc}") from exc
+            response = await page.goto(book_url, wait_until="domcontentloaded", timeout=30000)
+            if response and response.status >= 400:
+                raise ConnectionError(f"HTTP {response.status} reaching Anna's Archive")
+            html = await page.content()
+
+            detail = _parse_book_detail(html, book_url)
+
+            # Step 3: follow mirror_page to extract the real download URL
+            if detail["mirror_page"]:
+                detail["download_url"] = await _resolve_download_url(page, detail["mirror_page"])
+
+            return detail
         except Exception as exc:
             raise ConnectionError(f"Error reaching Anna's Archive: {exc}") from exc
-
-        detail = _parse_book_detail(resp.text, book_url)
-
-        # Step 3: follow mirror_page to extract the real download URL
-        if detail["mirror_page"]:
-            detail["download_url"] = await _resolve_download_url(client, detail["mirror_page"])
-
-    return detail
+        finally:
+            await browser.close()
 
 
 def _parse_book_detail(html: str, url: str) -> dict:
@@ -320,18 +331,20 @@ def _parse_book_detail(html: str, url: str) -> dict:
 
 # ── Step 3 — Resolve mirror page → actual file URL ───────────────────────────
 
-async def _resolve_download_url(client: AsyncSession, mirror_page_url: str) -> Optional[str]:
+async def _resolve_download_url(page, mirror_page_url: str) -> Optional[str]:
     """
     Fetch the slow_download page and pull out the direct file URL.
     The page shows: "To download, copy this URL..." followed by the real link.
     """
     try:
-        resp = await client.get(mirror_page_url)
-        resp.raise_for_status()
+        response = await page.goto(mirror_page_url, wait_until="domcontentloaded", timeout=30000)
+        if response and response.status >= 400:
+            return None
+        html = await page.content()
     except Exception:
         return None
 
-    return _extract_download_url(resp.text)
+    return _extract_download_url(html)
 
 
 def _extract_download_url(html: str) -> Optional[str]:

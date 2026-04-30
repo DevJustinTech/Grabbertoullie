@@ -251,19 +251,28 @@ async def search_annas_archive(title: str, author: str = "") -> List[Dict[str, A
     ANNAS_MIRROR = "https://annas-archive.gl"
 
     try:
-        from curl_cffi.requests import AsyncSession # type: ignore
+        from playwright.async_api import async_playwright
 
-        async with AsyncSession(impersonate="chrome110") as s:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                extra_http_headers={"Accept-Language": "en-US,en;q=0.9"}
+            )
+            page = await context.new_page()
+
             url = f"{ANNAS_MIRROR}/search?q={encoded_query}"
             try:
-                r = await s.get(url, timeout=15.0)
-                if r.status_code != 200:
-                    logger.error(f"Anna's Archive returned {r.status_code}")
+                r = await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+                if r and r.status >= 400:
+                    logger.error(f"Anna's Archive returned {r.status}")
                     return results
-                resp_text = r.text
+                resp_text = await page.content()
             except Exception as e:
                 logger.error(f"Anna's Archive search request failed: {e}")
                 return results
+            finally:
+                await browser.close()
 
             soup = BeautifulSoup(resp_text, 'html.parser')
             md5_elements = soup.select('a[href^="/md5/"]')
