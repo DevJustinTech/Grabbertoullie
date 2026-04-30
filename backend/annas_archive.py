@@ -23,7 +23,7 @@ from collections import defaultdict
 from dataclasses import dataclass, asdict
 from typing import Optional
 
-import httpx # pyre-ignore
+from curl_cffi.requests import AsyncSession, RequestsError  # pyre-ignore
 from bs4 import BeautifulSoup
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -81,8 +81,8 @@ def _clean(text: Optional[str]) -> str:
     return (text or "").strip()
 
 
-def _make_client() -> httpx.AsyncClient:
-    return httpx.AsyncClient(headers=HEADERS, follow_redirects=True, timeout=20)
+def _make_client() -> AsyncSession:
+    return AsyncSession(impersonate="chrome", headers=HEADERS, timeout=30)
 
 
 # ── Step 1 — Search ───────────────────────────────────────────────────────────
@@ -115,13 +115,13 @@ async def search_books(
         try:
             resp = await client.get(url)
             resp.raise_for_status()
-        except httpx.ConnectError as exc:
+        except RequestsError as exc:
             raise ConnectionError(
                 f"Cannot reach Anna's Archive ({BASE_URL}). "
                 f"Try a different BASE_URL mirror. ({exc})"
             ) from exc
-        except httpx.HTTPStatusError as exc:
-            raise ConnectionError(f"HTTP {exc.response.status_code} from Anna's Archive") from exc
+        except Exception as exc:
+            raise ConnectionError(f"Error reaching Anna's Archive: {exc}") from exc
 
     return _parse_search(resp.text, file_type)
 
@@ -245,10 +245,10 @@ async def get_book_info(book_url: str) -> dict:
         try:
             resp = await client.get(book_url)
             resp.raise_for_status()
-        except httpx.ConnectError as exc:
+        except RequestsError as exc:
             raise ConnectionError(f"Cannot reach Anna's Archive: {exc}") from exc
-        except httpx.HTTPStatusError as exc:
-            raise ConnectionError(f"HTTP {exc.response.status_code}") from exc
+        except Exception as exc:
+            raise ConnectionError(f"Error reaching Anna's Archive: {exc}") from exc
 
         detail = _parse_book_detail(resp.text, book_url)
 
@@ -320,7 +320,7 @@ def _parse_book_detail(html: str, url: str) -> dict:
 
 # ── Step 3 — Resolve mirror page → actual file URL ───────────────────────────
 
-async def _resolve_download_url(client: httpx.AsyncClient, mirror_page_url: str) -> Optional[str]:
+async def _resolve_download_url(client: AsyncSession, mirror_page_url: str) -> Optional[str]:
     """
     Fetch the slow_download page and pull out the direct file URL.
     The page shows: "To download, copy this URL..." followed by the real link.
@@ -328,7 +328,7 @@ async def _resolve_download_url(client: httpx.AsyncClient, mirror_page_url: str)
     try:
         resp = await client.get(mirror_page_url)
         resp.raise_for_status()
-    except (httpx.ConnectError, httpx.HTTPStatusError):
+    except Exception:
         return None
 
     return _extract_download_url(resp.text)
