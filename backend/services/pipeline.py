@@ -204,12 +204,13 @@ def needs_disambiguation(ranked_results: List[Dict[str, Any]], metadata: Dict[st
     return False
 
 
-def generate_disambiguation_payload(ranked_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+def generate_disambiguation_payload(ranked_results: List[Dict[str, Any]], metadata: Dict[str, Any]) -> Dict[str, Any]:
     """
     Creates the disambiguation response.
     """
     candidates = []
     seen = set()
+    target_format = metadata.get("format", "any")
 
     for res in ranked_results:
         if res.get("_score", 0) < 0:
@@ -242,5 +243,6 @@ def generate_disambiguation_payload(ranked_results: List[Dict[str, Any]]) -> Dic
 
     return {
         "status":     "disambiguation_required",
-        "candidates": candidates
+        "candidates": candidates,
+        "format":     target_format
     }
