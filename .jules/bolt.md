@@ -9,3 +9,7 @@
 ## 2025-02-27 - httpx.AsyncClient Instantiation Overhead
 **Learning:** During concurrent validation of book URLs using `asyncio.gather` in `chat_stream_generator` (which calls `validate_url`), a new `httpx.AsyncClient` was instantiated on every iteration inside a `for` loop. This caused a significant overhead (spinning up and tearing down the client machinery, including its internal connection pools and states). Benchmarks showed that initializing 50 clients takes ~2-3 seconds, whereas executing requests with a shared client takes ~0.03 seconds.
 **Action:** Use a module-level `httpx.AsyncClient` instance for multiple asynchronous outbound requests when working with heavily concurrent HTTP tasks instead of recreating it via `async with httpx.AsyncClient()` dynamically inside task worker functions.
+
+## 2024-05-25 - Async DNS Resolution Event Loop Blocking
+**Learning:** Using `socket.getaddrinfo` synchronously in an async route handler or event hook blocks the event loop. Given this API receives concurrent requests that involve SSRF mitigation using `is_valid_url`, blocking the event loop on DNS resolution significantly degraded concurrency and throughput.
+**Action:** Use `await asyncio.get_running_loop().getaddrinfo(...)` when doing DNS lookups inside the async event loop to keep the process non-blocking and highly concurrent.

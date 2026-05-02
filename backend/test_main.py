@@ -40,3 +40,15 @@ async def test_ssrf_redirect_protection():
 
         assert response.status_code == 400
         assert "SSRF Attempt blocked" in response.json()["detail"] or "Invalid or restricted URL domain/IP" in response.json()["detail"]
+
+from main import is_valid_url
+
+@pytest.mark.asyncio
+async def test_is_valid_url():
+    valid, reason = await is_valid_url("http://google.com")
+    assert valid
+
+@pytest.mark.asyncio
+async def test_is_invalid_url():
+    valid, reason = await is_valid_url("http://localhost")
+    assert not valid
