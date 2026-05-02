@@ -125,10 +125,22 @@ export default function Home() {
     }
   };
 
-  const handleDownload = (url: string) => {
-    // Navigate to the download proxy endpoint to avoid CORS issues and force download
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
-    window.location.href = `${apiUrl}/api/download?url=${encodeURIComponent(url)}`;
+  const handleDownload = (url: string, source?: string) => {
+    if (source === "Z-Library") {
+      // Direct download for Z-Library
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = '';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      // Navigate to the download proxy endpoint to avoid CORS issues and force download
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+      window.location.href = `${apiUrl}/api/download?url=${encodeURIComponent(url)}`;
+    }
   };
 
   return (
@@ -191,7 +203,7 @@ export default function Home() {
                       <span className="text-xs font-semibold bg-zinc-100 text-zinc-700 px-2 py-1 rounded-md">{msg.result.extension?.toUpperCase()}</span>
                     </div>
                     <button
-                      onClick={() => handleDownload(msg.result!.file_url!)}
+                      onClick={() => handleDownload(msg.result!.file_url!, msg.result!.source)}
                       className="w-full bg-zinc-900 hover:bg-zinc-800 text-white py-2.5 px-4 rounded-xl transition-all duration-200 text-sm font-medium flex items-center justify-center gap-2 group active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
                     >
                       <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 group-hover:-translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
