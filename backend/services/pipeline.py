@@ -197,6 +197,12 @@ def needs_disambiguation(ranked_results: List[Dict[str, Any]], metadata: Dict[st
     top_score = good_candidates[0].get("_score", 0)
     runner_up_score = good_candidates[1].get("_score", 0)
 
+    # Check if the top result is an incredibly strong match (>= 60) AND we have an exact intent
+    # Note: when fuzzy=False, we treat it as an exact request, and thus skip the score closeness test
+    # if the top candidate is already a solid match.
+    if top_score >= 60:
+        return False
+
     # If the second best is within 15 points of the best, it's ambiguous
     if top_score - runner_up_score <= 15:
         return True

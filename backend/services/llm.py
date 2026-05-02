@@ -37,6 +37,13 @@ def extract_json_from_response(text: str) -> dict:
 
 def _fallback_extract(user_message: str) -> Dict[str, Any]:
     user_message = user_message.strip()
+
+    is_exact = False
+    if "[exact]" in user_message.lower():
+        is_exact = True
+        # Remove [exact] case-insensitively
+        user_message = re.sub(r'\[exact\]', '', user_message, flags=re.IGNORECASE).strip()
+
     # Try to extract format at the end
     fmt = "pdf"
     msg_lower = user_message.lower()
@@ -61,16 +68,24 @@ def _fallback_extract(user_message: str) -> Dict[str, Any]:
         "author": "",
         "year": "",
         "format": fmt,
-        "fuzzy": False if title else True
+        "fuzzy": False if is_exact or title else True
     }
 
 async def extract_metadata_from_query(user_message: str, groq_api_key: str) -> Dict[str, Any]:
     """
     Uses the LLM to extract structured metadata from the user's query.
     """
+    is_exact = False
+    if "[exact]" in user_message.lower():
+        is_exact = True
+        user_message = re.sub(r'\[exact\]', '', user_message, flags=re.IGNORECASE).strip()
+
     if not groq_api_key or groq_api_key == "your_groq_api_key_here":
-        # Fallback dummy metadata
-        return _fallback_extract(user_message)
+        # Fallback dummy metadata. We pass the modified user_message without [exact]
+        metadata = _fallback_extract(user_message)
+        if is_exact:
+            metadata["fuzzy"] = False
+        return metadata
 
     system_prompt = """You are a precise Book Metadata Extraction Agent.
 Your job is to analyze a user's request for a book and extract structured metadata.
@@ -131,12 +146,21 @@ You must output ONLY valid JSON in this exact structure:
             if "fuzzy" not in metadata:
                 metadata["fuzzy"] = True
 
+            if is_exact:
+                metadata["fuzzy"] = False
+
             return metadata
 
     except Exception as e:
         logger.error(f"Failed to get metadata from AI: {e}")
-        return _fallback_extract(user_message)
+        metadata = _fallback_extract(user_message)
+        if is_exact:
+            metadata["fuzzy"] = False
+        return metadata
     
     # Fallback to satisfy Pyre's path analysis of async with blocks
-    return _fallback_extract(user_message)
+    metadata = _fallback_extract(user_message)
+    if is_exact:
+        metadata["fuzzy"] = False
+    return metadata
 
