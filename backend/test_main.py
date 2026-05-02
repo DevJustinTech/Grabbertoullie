@@ -29,3 +29,14 @@ async def test_ssrf_protection():
         response = await ac.get("/api/download?url=file:///etc/passwd")
         assert response.status_code == 400
         assert "Invalid URL scheme" in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_ssrf_redirect_protection():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        # httpbin.org/redirect-to redirects to the provided URL parameter
+        # This will test if our httpx client follows the redirect to an internal IP and catches it
+        response = await ac.get("/api/download?url=http://httpbin.org/redirect-to?url=http://169.254.169.254/")
+
+        assert response.status_code == 400
+        assert "SSRF Attempt blocked" in response.json()["detail"] or "Invalid or restricted URL domain/IP" in response.json()["detail"]
