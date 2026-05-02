@@ -188,7 +188,7 @@ export default function Home() {
                         key={i}
                         onClick={() => {
                           const formatSuffix = msg.result?.format && msg.result.format !== "any" ? ` ${msg.result.format}` : "";
-                          handleSendMessage(`grab ${candidate.raw_title} by ${candidate.raw_author}${formatSuffix}`);
+                          handleSendMessage(`grab ${candidate.raw_title} by ${candidate.raw_author}${formatSuffix} [exact]`);
                         }}
                         className="text-left bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-800 py-2.5 px-4 rounded-xl transition-all duration-200 text-sm font-medium active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
                       >
