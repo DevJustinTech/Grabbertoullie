@@ -6,6 +6,8 @@ import httpx
 # pyre-ignore[21]
 from rapidfuzz import fuzz
 # pyre-ignore[21]
+from playwright.async_api import async_playwright
+# pyre-ignore[21]
 from .search import (
     search_zlibrary
 )
@@ -16,13 +18,49 @@ logger = logging.getLogger(__name__)
 # during concurrent URL validations.
 _shared_client = httpx.AsyncClient()
 
+async def _validate_zlib_url(url: str) -> bool:
+    """
+    Validates a Z-Library download URL using Playwright to bypass Cloudflare.
+    Listens for the download event to ensure the file is accessible.
+    """
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            )
+            page = await context.new_page()
+            try:
+                async with page.expect_download(timeout=15000) as download_info:
+                    try:
+                        await page.goto(url, wait_until="domcontentloaded", timeout=10000)
+                    except Exception:
+                        pass # goto might throw if download starts immediately
+                download = await download_info.value
+                await download.cancel()
+                return True
+            except Exception as e:
+                logger.debug(f"Playwright validation failed for {url}: {e}")
+                return False
+            finally:
+                await browser.close()
+    except Exception as e:
+        logger.error(f"Playwright setup failed: {e}")
+        return False
+
 async def validate_url(url: str) -> bool:
     """
     Validates a URL to check if it's accessible.
-    First uses HEAD, falls back to GET stream if HEAD returns 405.
+    Uses Playwright for Z-Library URLs to bypass Cloudflare.
+    For other URLs, uses HEAD, falls back to GET stream if HEAD returns 405.
     """
     if not url:
         return False
+
+    # Check if this is a Z-Library domain
+    if any(domain in url for domain in ["z-lib", "z-library", "1lib"]):
+        return await _validate_zlib_url(url)
+
     try:
         r = await _shared_client.head(url, timeout=5, follow_redirects=True)
         if r.status_code == 405:
