@@ -35,19 +35,42 @@ def extract_json_from_response(text: str) -> dict:
                 pass
         raise ValueError(f"Could not parse JSON from response")
 
+def _fallback_extract(user_message: str) -> Dict[str, Any]:
+    user_message = user_message.strip()
+    # Try to extract format at the end
+    fmt = "pdf"
+    msg_lower = user_message.lower()
+    if msg_lower.endswith(" pdf"):
+        fmt = "pdf"
+        user_message = user_message[:-4].strip()
+    elif msg_lower.endswith(" epub"):
+        fmt = "epub"
+        user_message = user_message[:-5].strip()
+
+    # Try to strip common command prefixes
+    prefixes = ["grab ", "find ", "get ", "search for ", "download "]
+    msg_lower_now = user_message.lower()
+    for prefix in prefixes:
+        if msg_lower_now.startswith(prefix):
+            user_message = user_message[len(prefix):].strip()
+            break
+
+    title = user_message
+    return {
+        "title": title,
+        "author": "",
+        "year": "",
+        "format": fmt,
+        "fuzzy": False if title else True
+    }
+
 async def extract_metadata_from_query(user_message: str, groq_api_key: str) -> Dict[str, Any]:
     """
     Uses the LLM to extract structured metadata from the user's query.
     """
     if not groq_api_key or groq_api_key == "your_groq_api_key_here":
         # Fallback dummy metadata
-        return {
-            "title": user_message,
-            "author": "",
-            "year": "",
-            "format": "pdf",
-            "fuzzy": True
-        }
+        return _fallback_extract(user_message)
 
     system_prompt = """You are a precise Book Metadata Extraction Agent.
 Your job is to analyze a user's request for a book and extract structured metadata.
@@ -112,20 +135,8 @@ You must output ONLY valid JSON in this exact structure:
 
     except Exception as e:
         logger.error(f"Failed to get metadata from AI: {e}")
-        return {
-            "title": user_message,
-            "author": "",
-            "year": "",
-            "format": "pdf",
-            "fuzzy": True
-        }
+        return _fallback_extract(user_message)
     
     # Fallback to satisfy Pyre's path analysis of async with blocks
-    return {
-        "title": user_message,
-        "author": "",
-        "year": "",
-        "format": "pdf",
-        "fuzzy": True
-    }
+    return _fallback_extract(user_message)
 
