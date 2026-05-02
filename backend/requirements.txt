@@ -6,3 +6,4 @@ pydantic
 beautifulsoup4
 curl_cffi
 rapidfuzz
+playwright
