@@ -12,6 +12,10 @@ from .search import (
 
 logger = logging.getLogger(__name__)
 
+# Shared client to prevent connection pooling and instantiation overhead
+# during concurrent URL validations.
+_shared_client = httpx.AsyncClient()
+
 async def validate_url(url: str) -> bool:
     """
     Validates a URL to check if it's accessible.
@@ -20,18 +24,14 @@ async def validate_url(url: str) -> bool:
     if not url:
         return False
     try:
-        async with httpx.AsyncClient() as client:
-            r = await client.head(url, timeout=5, follow_redirects=True)
-            if r.status_code == 405:
-                async with client.stream("GET", url, timeout=5, follow_redirects=True) as r_get:
-                    return r_get.status_code < 400
-            return r.status_code < 400
+        r = await _shared_client.head(url, timeout=5, follow_redirects=True)
+        if r.status_code == 405:
+            async with _shared_client.stream("GET", url, timeout=5, follow_redirects=True) as r_get:
+                return r_get.status_code < 400
+        return r.status_code < 400
     except Exception as e:
         logger.debug(f"Validation failed for {url}: {e}")
         return False
-    
-    # Catch-all return to satisfy Pyre path analysis over async with
-    return False
 
 async def perform_parallel_search(metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
