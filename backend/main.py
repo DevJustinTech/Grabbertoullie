@@ -395,6 +395,13 @@ def is_valid_url(url: str) -> Tuple[bool, str]:
     except Exception as e:
         return False, str(e)
 
+async def check_url_hook(request: httpx.Request):
+    # Prevent SSRF by validating redirects using the same is_valid_url logic
+    valid, reason = is_valid_url(str(request.url))
+    if not valid:
+        # Instead of ValueError, we can raise an HTTPException so it is handled correctly by FastAPI
+        raise HTTPException(status_code=400, detail=f"SSRF Attempt blocked: {reason}")
+
 @app.get("/api/download")
 async def download_endpoint(url: str):
     valid, reason = is_valid_url(url)
@@ -402,7 +409,7 @@ async def download_endpoint(url: str):
         raise HTTPException(status_code=400, detail=reason)
 
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
+        async with httpx.AsyncClient(follow_redirects=True, event_hooks={"request": [check_url_hook]}) as client:
             response = await client.get(url)
             response.raise_for_status()
 
