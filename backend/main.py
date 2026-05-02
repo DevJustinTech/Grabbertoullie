@@ -267,10 +267,11 @@ async def chat_stream_generator(user_message: str):
 
         # Step 4: Check for Disambiguation
         if needs_disambiguation(ranked, metadata):
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Multiple matches found. Need clarification.'})}\n\n"
-            await asyncio.sleep(0.05)
-            payload = generate_disambiguation_payload(ranked)
-            if payload.get("candidates"):
+            payload = generate_disambiguation_payload(ranked, metadata)
+            # If after deduplication we only have 1 unique candidate, skip disambiguation
+            if len(payload.get("candidates", [])) > 1:
+                yield f"data: {json.dumps({'type': 'status', 'message': 'Multiple matches found. Need clarification.'})}\n\n"
+                await asyncio.sleep(0.05)
                 final = {"type": "disambiguation", "data": payload}
                 yield f"data: {json.dumps(final)}\n\n"
                 return
