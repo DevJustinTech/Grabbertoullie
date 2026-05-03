@@ -11,12 +11,13 @@ from playwright.async_api import async_playwright
 from .search import (
     search_zlibrary
 )
+from services.security import check_url_hook
 
 logger = logging.getLogger(__name__)
 
 # Shared client to prevent connection pooling and instantiation overhead
 # during concurrent URL validations.
-_shared_client = httpx.AsyncClient()
+_shared_client = httpx.AsyncClient(event_hooks={"request": [check_url_hook]})
 
 async def _validate_zlib_url(url: str) -> bool:
     """

@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 from fastapi.responses import StreamingResponse # type: ignore
 from services.llm import extract_metadata_from_query
 from services.pipeline import perform_parallel_search, score_and_rank_results, format_best_result, needs_disambiguation, generate_disambiguation_payload, validate_url  # pyre-ignore
+from services.security import is_valid_url, check_url_hook
 
 import asyncio
 from pydantic import BaseModel  # type: ignore
@@ -11,8 +12,6 @@ import httpx  # type: ignore
 import os
 import json
 import logging
-import socket
-import ipaddress
 from typing import Tuple
 from urllib.parse import urlparse
 from dotenv import load_dotenv  # type: ignore
@@ -366,42 +365,6 @@ async def chat_endpoint(request: ChatRequest):
             "Connection": "keep-alive",
         }
     )
-
-def is_valid_url(url: str) -> Tuple[bool, str]:
-    try:
-        parsed = urlparse(url)
-        if parsed.scheme not in ["http", "https"]:
-            return False, "Invalid URL scheme. Only HTTP and HTTPS are allowed."
-
-        hostname = parsed.hostname
-        if not hostname:
-            return False, "Invalid URL format."
-
-        # Optional: Resolve hostname to IP and check if it's public.
-        # This prevents accessing localhost or internal networks.
-        # Since resolving every time can be complex asynchronously, we block obvious local IPs.
-        try:
-            # Prevent SSRF: Resolve to IP and block private/loopback/restricted IPs.
-            # Use getaddrinfo to support both IPv4 and IPv6 to prevent IPv6 bypasses.
-            addr_info = socket.getaddrinfo(hostname, None)
-            for res in addr_info:
-                ip = res[4][0]
-                ip_obj = ipaddress.ip_address(ip)
-                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_multicast or ip_obj.is_reserved or ip_obj.is_link_local:
-                    return False, "Invalid or restricted URL domain/IP."
-        except socket.gaierror:
-            pass  # DNS resolution failed, might still be valid or handled by httpx later
-
-        return True, ""
-    except Exception as e:
-        return False, str(e)
-
-async def check_url_hook(request: httpx.Request):
-    # Prevent SSRF by validating redirects using the same is_valid_url logic
-    valid, reason = is_valid_url(str(request.url))
-    if not valid:
-        # Instead of ValueError, we can raise an HTTPException so it is handled correctly by FastAPI
-        raise HTTPException(status_code=400, detail=f"SSRF Attempt blocked: {reason}")
 
 @app.get("/api/download")
 async def download_endpoint(url: str):

@@ -12,3 +12,8 @@
 **Vulnerability:** Server-Side Request Forgery (SSRF) bypass due to `httpx.AsyncClient` following redirects without re-validating the new destination URLs.
 **Learning:** URL validation at the endpoint level only checks the initial URL. If an HTTP client is configured to follow redirects (`follow_redirects=True`), it will automatically traverse to the new location without running the application's validation logic, allowing attackers to use an external URL that redirects to internal/private IPs.
 **Prevention:** Intercept all requests, including redirects, by utilizing `event_hooks` (e.g., `event_hooks={"request": [check_url_hook]}`) in HTTP clients like `httpx` to run validation on every request attempt.
+
+## 2024-05-28 - [SSRF Bypass via DNS Resolution Failures]
+**Vulnerability:** An SSRF bypass where malicious formats of IP addresses (e.g., `2130706433` for `127.0.0.1`) caused `socket.getaddrinfo` to throw `socket.gaierror`. The previous validation code swallowed this error and incorrectly marked the URL as safe.
+**Learning:** `httpx` and internal C libraries may still resolve and connect to these IP addresses even if `socket.getaddrinfo` rejects them. Failsafe mechanisms must fail closed. Also, global `httpx.AsyncClient` objects used in background tasks must explicitly hook into validation routines to prevent unauthenticated SSRF loops.
+**Prevention:** Catch `socket.gaierror` and `return False` in URL validation, and ensure all HTTP clients initialize with `event_hooks={"request": [check_url_hook]}`.
