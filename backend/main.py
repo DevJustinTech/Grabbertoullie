@@ -379,7 +379,8 @@ async def is_valid_url(url: str) -> Tuple[bool, str]:
 
         # Optional: Resolve hostname to IP and check if it's public.
         # This prevents accessing localhost or internal networks.
-        # Since resolving every time can be complex asynchronously, we block obvious local IPs.
+        # Use asyncio.get_running_loop().getaddrinfo to prevent blocking the event loop
+        # during DNS resolution.
         try:
             # Prevent SSRF: Resolve to IP and block private/loopback/restricted IPs.
             # Use getaddrinfo to support both IPv4 and IPv6 to prevent IPv6 bypasses.
