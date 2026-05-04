@@ -161,8 +161,16 @@ export default function Home() {
                 </svg>
               </div>
               <h2 className="text-2xl font-semibold text-zinc-800">What book are you looking for?</h2>
-              <p className="text-zinc-500 max-w-md">
-                Simply type the name of the book you want to find. For example, <button onClick={() => handleSendMessage("grab The Alchemist pdf")} className="text-zinc-800 font-medium bg-zinc-100 hover:bg-zinc-200 transition-colors px-2 py-0.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-1">grab The Alchemist pdf</button>.
+              <p className="text-zinc-500 max-w-md leading-relaxed">
+                Simply type the name of the book you want to find. For example,{" "}
+                <button
+                  onClick={() => handleSendMessage("grab The Alchemist pdf")}
+                  className="text-zinc-800 font-medium bg-zinc-100 hover:bg-zinc-200 px-2 py-0.5 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
+                  aria-label="Search for grab The Alchemist pdf"
+                >
+                  grab The Alchemist pdf
+                </button>
+                .
               </p>
             </div>
           )}
@@ -230,7 +238,13 @@ export default function Home() {
                   <div className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: "0.3s" }}></div>
                 </div>
                 {streamStatus && (
-                  <p className="text-xs text-zinc-500 italic animate-pulse" aria-live="polite" aria-atomic="true">{streamStatus}</p>
+                  <p
+                    className="text-xs text-zinc-500 italic animate-pulse"
+                    aria-live="polite"
+                    aria-atomic="true"
+                  >
+                    {streamStatus}
+                  </p>
                 )}
               </div>
             </div>
