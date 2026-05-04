@@ -9,3 +9,8 @@
 **Learning:** Static examples in empty states (like "e.g. search for X") are missed opportunities. Making them interactive one-click trials significantly lowers the barrier to first interaction while also teaching users exactly what formatting the app expects. Additionally, ensuring these interactive elements are fully accessible (proper focus visible states, hover effects, aria-labels) ensures all users benefit from the trial action.
 
 **Action:** Whenever introducing a static text example to guide user input, convert it to an accessible interactive button that automatically runs the example. Add `focus-visible` styling (`focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2`) to align with design system standards.
+## 2025-03-02 - Interactive Empty States Reduce Friction
+
+**Learning:** Static examples in empty states (like "Try searching for...") ask users to do unnecessary work (typing the example). Users often want a quick, zero-friction way to see how the app works on their first visit.
+
+**Action:** Whenever possible, convert static example queries or actions in empty states into interactive, one-click buttons that automatically populate and submit the form. This provides immediate value and reduces the barrier to first interaction.
