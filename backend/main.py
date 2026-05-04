@@ -7,6 +7,8 @@ from services.pipeline import perform_parallel_search, score_and_rank_results, f
 from services.security import is_valid_url, check_url_hook
 
 import asyncio
+import socket
+import ipaddress
 from pydantic import BaseModel  # type: ignore
 import httpx  # type: ignore
 import os
@@ -351,7 +353,7 @@ async def chat_stream_generator(user_message: str):
 
     except Exception as e:
         logger.error(f"Error in chat stream: {e}", exc_info=True)
-        final = {"type": "result", "data": {"status": "fail", "reason": f"An error occurred: {str(e)}"}}
+        final = {"type": "result", "data": {"status": "fail", "reason": "An internal error occurred."}}
         yield f"data: {json.dumps(final)}\n\n"
 
 
@@ -397,7 +399,7 @@ async def is_valid_url(url: str) -> Tuple[bool, str]:
 
         return True, ""
     except Exception as e:
-        return False, str(e)
+        return False, "An error occurred while validating the URL."
 
 async def check_url_hook(request: httpx.Request):
     # Prevent SSRF by validating redirects using the same is_valid_url logic
@@ -424,17 +426,24 @@ async def download_endpoint(url: str):
             # Suggest a filename from the URL or Content-Disposition
             content_disposition = response.headers.get("content-disposition")
             if content_disposition:
-                headers["Content-Disposition"] = content_disposition
+                # Sanitize upstream header to prevent HTTP header injection
+                sanitized_disposition = re.sub(r'[\r\n]', '', content_disposition)
+                headers["Content-Disposition"] = sanitized_disposition
             else:
                 filename = url.split("/")[-1]
                 if not filename or "?" in filename:
                     filename = "downloaded_file"
-                headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+                # Sanitize filename to prevent HTTP header injection and escaping quotes
+                sanitized_filename = re.sub(r'[\r\n"]', '_', filename)
+                headers["Content-Disposition"] = f'attachment; filename="{sanitized_filename}"'
 
             return Response(content=response.content, status_code=response.status_code, headers=headers)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Download failed: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Download failed due to an internal error.")
 
 @app.get("/webhook")
 async def verify_webhook(request: Request):
