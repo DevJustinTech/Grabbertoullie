@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 from fastapi.responses import StreamingResponse # type: ignore
 from services.llm import extract_metadata_from_query
 from services.pipeline import perform_parallel_search, score_and_rank_results, format_best_result, needs_disambiguation, generate_disambiguation_payload, validate_url  # pyre-ignore
+from services.security import is_valid_url, check_url_hook
 
 import asyncio
 from pydantic import BaseModel  # type: ignore
@@ -11,8 +12,6 @@ import httpx  # type: ignore
 import os
 import json
 import logging
-import socket
-import ipaddress
 from typing import Tuple
 from urllib.parse import urlparse
 from dotenv import load_dotenv  # type: ignore
@@ -367,7 +366,7 @@ async def chat_endpoint(request: ChatRequest):
         }
     )
 
-def is_valid_url(url: str) -> Tuple[bool, str]:
+async def is_valid_url(url: str) -> Tuple[bool, str]:
     try:
         parsed = urlparse(url)
         if parsed.scheme not in ["http", "https"]:
@@ -379,11 +378,15 @@ def is_valid_url(url: str) -> Tuple[bool, str]:
 
         # Optional: Resolve hostname to IP and check if it's public.
         # This prevents accessing localhost or internal networks.
-        # Since resolving every time can be complex asynchronously, we block obvious local IPs.
+        # Use asyncio.get_running_loop().getaddrinfo to prevent blocking the event loop
+        # during DNS resolution.
         try:
             # Prevent SSRF: Resolve to IP and block private/loopback/restricted IPs.
             # Use getaddrinfo to support both IPv4 and IPv6 to prevent IPv6 bypasses.
-            addr_info = socket.getaddrinfo(hostname, None)
+            # ⚡ Bolt: Use loop.getaddrinfo() to prevent the synchronous socket.getaddrinfo()
+            # from blocking the asyncio event loop during slow DNS resolutions.
+            loop = asyncio.get_running_loop()
+            addr_info = await loop.getaddrinfo(hostname, None)
             for res in addr_info:
                 ip = res[4][0]
                 ip_obj = ipaddress.ip_address(ip)
@@ -398,14 +401,14 @@ def is_valid_url(url: str) -> Tuple[bool, str]:
 
 async def check_url_hook(request: httpx.Request):
     # Prevent SSRF by validating redirects using the same is_valid_url logic
-    valid, reason = is_valid_url(str(request.url))
+    valid, reason = await is_valid_url(str(request.url))
     if not valid:
         # Instead of ValueError, we can raise an HTTPException so it is handled correctly by FastAPI
         raise HTTPException(status_code=400, detail=f"SSRF Attempt blocked: {reason}")
 
 @app.get("/api/download")
 async def download_endpoint(url: str):
-    valid, reason = is_valid_url(url)
+    valid, reason = await is_valid_url(url)
     if not valid:
         raise HTTPException(status_code=400, detail=reason)
 
