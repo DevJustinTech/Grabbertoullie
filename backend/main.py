@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 from fastapi.responses import StreamingResponse # type: ignore
 from services.llm import extract_metadata_from_query
 from services.pipeline import perform_parallel_search, score_and_rank_results, format_best_result, needs_disambiguation, generate_disambiguation_payload, validate_url  # pyre-ignore
+from services.security import is_valid_url, check_url_hook
 
 import asyncio
 from pydantic import BaseModel  # type: ignore
@@ -11,8 +12,6 @@ import httpx  # type: ignore
 import os
 import json
 import logging
-import socket
-import ipaddress
 from typing import Tuple
 from urllib.parse import urlparse
 from dotenv import load_dotenv  # type: ignore
