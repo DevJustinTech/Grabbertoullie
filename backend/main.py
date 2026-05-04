@@ -384,6 +384,8 @@ async def is_valid_url(url: str) -> Tuple[bool, str]:
         try:
             # Prevent SSRF: Resolve to IP and block private/loopback/restricted IPs.
             # Use getaddrinfo to support both IPv4 and IPv6 to prevent IPv6 bypasses.
+            # ⚡ Bolt: Use loop.getaddrinfo() to prevent the synchronous socket.getaddrinfo()
+            # from blocking the asyncio event loop during slow DNS resolutions.
             loop = asyncio.get_running_loop()
             addr_info = await loop.getaddrinfo(hostname, None)
             for res in addr_info:
