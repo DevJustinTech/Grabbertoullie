@@ -13,3 +13,6 @@
 ## 2024-05-25 - Async DNS Resolution Event Loop Blocking
 **Learning:** Using `socket.getaddrinfo` synchronously in an async route handler or event hook blocks the event loop. Given this API receives concurrent requests that involve SSRF mitigation using `is_valid_url`, blocking the event loop on DNS resolution significantly degraded concurrency and throughput.
 **Action:** Use `await asyncio.get_running_loop().getaddrinfo(...)` when doing DNS lookups inside the async event loop to keep the process non-blocking and highly concurrent.
+## 2024-05-04 - Unblocking Asyncio DNS Resolution
+**Learning:** `socket.getaddrinfo` is a synchronous system call in Python that blocks the entire asyncio event loop during execution, potentially stalling concurrent incoming requests in ASGI frameworks like FastAPI if DNS resolution is slow.
+**Action:** When performing DNS validation in asynchronous endpoints, use `await asyncio.get_running_loop().getaddrinfo(...)` to offload the blocking call to the loop's default thread pool.
