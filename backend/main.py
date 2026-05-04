@@ -15,6 +15,8 @@ import logging
 from typing import Tuple
 from urllib.parse import urlparse
 from dotenv import load_dotenv  # type: ignore
+import socket
+import ipaddress
 import re
 
 # explicitly load the .env from the backend/ directory so it is found regardless of cwd
@@ -52,9 +54,12 @@ def extract_json_from_response(text: str) -> dict:
 
 app = FastAPI()
 
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "http://localhost:3001")
+allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
