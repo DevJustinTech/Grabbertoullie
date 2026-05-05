@@ -30,6 +30,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [streamStatus, setStreamStatus] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -38,6 +39,23 @@ export default function Home() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, loading, streamStatus]);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Focus input when '/' is pressed, unless user is already typing in an input/textarea
+      if (
+        e.key === "/" &&
+        document.activeElement?.tagName !== "INPUT" &&
+        document.activeElement?.tagName !== "TEXTAREA"
+      ) {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
 
   const handleSendMessage = (text: string) => {
     if (!text.trim()) return;
@@ -256,6 +274,7 @@ export default function Home() {
       <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent pb-6 pt-10 px-4">
         <div className="max-w-3xl mx-auto relative shadow-lg shadow-black/5 rounded-full">
           <input
+            ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -283,8 +302,10 @@ export default function Home() {
             )}
           </button>
         </div>
-        <p className="text-center text-[11px] text-zinc-400 mt-3 font-medium">
-          Press Enter to send. For best results, specify the format (e.g. pdf, epub).
+        <p className="text-center text-[11px] text-zinc-400 mt-3 font-medium flex items-center justify-center gap-1.5 flex-wrap">
+          Press <kbd className="px-1.5 py-0.5 text-[10px] font-sans bg-zinc-100 border border-zinc-200 text-zinc-500 rounded-md">Enter</kbd> to send.
+          Press <kbd className="px-1.5 py-0.5 text-[10px] font-sans bg-zinc-100 border border-zinc-200 text-zinc-500 rounded-md">/</kbd> to search.
+          For best results, specify the format (e.g. pdf).
         </p>
       </div>
     </div>
