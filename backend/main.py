@@ -12,6 +12,8 @@ import httpx  # type: ignore
 import os
 import json
 import logging
+import socket
+import ipaddress
 from typing import Tuple
 from urllib.parse import urlparse
 from dotenv import load_dotenv  # type: ignore
@@ -424,12 +426,16 @@ async def download_endpoint(url: str):
             # Suggest a filename from the URL or Content-Disposition
             content_disposition = response.headers.get("content-disposition")
             if content_disposition:
-                headers["Content-Disposition"] = content_disposition
+                # Sanitize to prevent HTTP Header Injection
+                sanitized_cd = content_disposition.replace('\r', '').replace('\n', '')
+                headers["Content-Disposition"] = sanitized_cd
             else:
                 filename = url.split("/")[-1]
                 if not filename or "?" in filename:
                     filename = "downloaded_file"
-                headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+                # Sanitize filename to prevent HTTP Header Injection and XSS
+                sanitized_filename = filename.replace('\r', '').replace('\n', '').replace('"', '')
+                headers["Content-Disposition"] = f'attachment; filename="{sanitized_filename}"'
 
             return Response(content=response.content, status_code=response.status_code, headers=headers)
     except Exception as e:
