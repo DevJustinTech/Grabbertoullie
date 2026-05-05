@@ -262,7 +262,7 @@ export default function Home() {
             onKeyDown={(e) => e.key === "Enter" && handleSendMessage(input)}
             placeholder="Type your request here..."
             aria-label="Search for a book"
-            className="w-full bg-white border border-zinc-200 shadow-sm rounded-full pl-6 pr-14 py-4 focus:outline-none focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100 transition-all text-zinc-800 placeholder:text-zinc-400 text-[15px]"
+            className="w-full bg-white border border-zinc-200 shadow-sm rounded-full pl-6 pr-14 py-4 focus:outline-none focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100 transition-all text-zinc-800 placeholder:text-zinc-400 text-[15px] disabled:opacity-50 disabled:bg-zinc-50 disabled:cursor-not-allowed"
             disabled={loading}
           />
           <button
@@ -284,7 +284,7 @@ export default function Home() {
           </button>
         </div>
         <p className="text-center text-[11px] text-zinc-400 mt-3 font-medium">
-          Press Enter to send. For best results, specify the format (e.g. pdf, epub).
+          Press <kbd className="px-1.5 py-0.5 bg-zinc-100 border border-zinc-200 rounded-md text-[10px] text-zinc-500 font-mono shadow-sm mx-0.5">Enter</kbd> to send. For best results, specify the format (e.g. pdf, epub).
         </p>
       </div>
     </div>
