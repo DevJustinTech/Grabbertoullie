@@ -25,3 +25,8 @@
 **Vulnerability:** Fast API string exceptions were leaked directly to the client via `HTTPException` detail fields and server-sent events (SSE). In addition, dynamically resolved `Content-Disposition` filenames in the download proxy lacked sanitization, creating an HTTP header injection and unescaped quotes vulnerability.
 **Learning:** Due to how FastAPI and Python format raw exceptions as strings (`str(e)`), raising `HTTPException(detail=str(e))` inherently leaks sensitive internal states or trace paths to the end user. Furthermore, proxying content dynamically requires sanitizing headers since variables implicitly injected without escaping create header injection risks.
 **Prevention:** Do not return explicit stack trace details via generic exception blocks. Instead, log the raw exception internally and map the response to a safe user-facing message. When building headers, aggressively strip characters like `\n`, `\r`, and `"` using `re.sub(r'[\r\n"]', '_', filename)`.
+
+## 2025-02-28 - Missing Webhook Authentication allows spoofing
+**Vulnerability:** The `/webhook` POST endpoint processed incoming WhatsApp events without verifying the payload signature (`X-Hub-Signature-256`), allowing unauthenticated attackers to spoof events.
+**Learning:** External webhook endpoints receiving events must always authenticate the payload to verify the origin and integrity of the data. WhatsApp uses an HMAC-SHA256 signature with the configured App Secret.
+**Prevention:** Verify incoming request payloads using `hmac` with `hashlib.sha256` by comparing the `X-Hub-Signature-256` header to a dynamically generated signature of the raw bytes using `hmac.compare_digest`. Ensure `WHATSAPP_APP_SECRET` is set in the environment.

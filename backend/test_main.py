@@ -52,3 +52,53 @@ async def test_is_valid_url():
 async def test_is_invalid_url():
     valid, reason = await is_valid_url("http://localhost")
     assert not valid
+
+@pytest.mark.asyncio
+async def test_webhook_post_auth_missing_signature(monkeypatch):
+    monkeypatch.setattr("main.WHATSAPP_APP_SECRET", "test_secret")
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.post("/webhook", json={"object": "whatsapp_business_account"})
+        assert response.status_code == 401
+        assert "Missing signature" in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_webhook_post_auth_invalid_signature(monkeypatch):
+    monkeypatch.setattr("main.WHATSAPP_APP_SECRET", "test_secret")
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.post(
+            "/webhook",
+            json={"object": "whatsapp_business_account"},
+            headers={"X-Hub-Signature-256": "sha256=invalid"}
+        )
+        assert response.status_code == 401
+        assert "Invalid signature" in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_webhook_post_auth_valid_signature(monkeypatch):
+    import hmac
+    import hashlib
+    import json
+
+    app_secret = "test_secret"
+    monkeypatch.setattr("main.WHATSAPP_APP_SECRET", app_secret)
+
+    payload = {"object": "whatsapp_business_account"}
+    raw_body = json.dumps(payload).encode('utf-8')
+
+    expected_sig = hmac.new(
+        app_secret.encode('utf-8'),
+        msg=raw_body,
+        digestmod=hashlib.sha256
+    ).hexdigest()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.post(
+            "/webhook",
+            content=raw_body,
+            headers={"X-Hub-Signature-256": f"sha256={expected_sig}"}
+        )
+        assert response.status_code == 200
+        assert response.text == "EVENT_RECEIVED"
