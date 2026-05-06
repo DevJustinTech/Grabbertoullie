@@ -255,40 +255,38 @@ async def search_zlibrary(title: str, author: str = "", fmt: str = "any") -> Lis
     try:
         zlib_results = await search_books(query_str, file_type=file_type)
 
-        # ⚡ Bolt: Fetch book detail pages concurrently to reduce latency by ~50%
-        async def _fetch_zlib_info(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-            link = item.get("link")
-            if not link:
-                return None
-            try:
-                info = await get_book_info(link)
-                download_url = info.get("download_url")
+        # Get top 3 items that have a link
+        top_items = [item for item in zlib_results if item.get("link")][:3]
+        links = [item.get("link") for item in top_items]
 
-                if download_url:
-                    item_title = item.get("title", "")
-                    item_author = item.get("author", "")
-                    item_format = item.get("format", "").lower()
+        # ⚡ Bolt: Fetch book detail pages using a single shared Playwright browser instance
+        # to prevent overhead of launching multiple Chromium browsers simultaneously.
+        if links:
+            from zlib_scraper import get_book_info_batch
+            fetched_infos = await get_book_info_batch(links)
 
-                    return {
-                        "source": "Z-Library",
-                        "title": item_title,
-                        "author": item_author,
-                        "year": "",
-                        "pdf_url": download_url if item_format == "pdf" else "",
-                        "epub_url": download_url if item_format == "epub" else "",
-                        "weight": 4
-                    }
-            except Exception as e:
-                logger.error(f"Failed to get info for Z-Library book '{item.get('title')}': {e}")
-            return None
+            for item, info in zip(top_items, fetched_infos):
+                if isinstance(info, Exception):
+                    logger.error(f"Failed to get info for Z-Library book '{item.get('title')}': {info}")
+                    continue
 
-        # Execute parallel requests for the top 3 items
-        fetch_tasks = [_fetch_zlib_info(item) for item in zlib_results[:3]]
-        fetched_results = await asyncio.gather(*fetch_tasks)
+                if info and hasattr(info, "get"):
+                    download_url = info.get("download_url")
 
-        for res in fetched_results:
-            if res:
-                results.append(res)
+                    if download_url:
+                        item_title = item.get("title", "")
+                        item_author = item.get("author", "")
+                        item_format = item.get("format", "").lower()
+
+                        results.append({
+                            "source": "Z-Library",
+                            "title": item_title,
+                            "author": item_author,
+                            "year": "",
+                            "pdf_url": download_url if item_format == "pdf" else "",
+                            "epub_url": download_url if item_format == "epub" else "",
+                            "weight": 4
+                        })
 
     except Exception as e:
         logger.error(f"Z-Library search failed: {e}")

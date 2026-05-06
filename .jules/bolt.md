@@ -16,3 +16,7 @@
 ## 2024-05-04 - Unblocking Asyncio DNS Resolution
 **Learning:** `socket.getaddrinfo` is a synchronous system call in Python that blocks the entire asyncio event loop during execution, potentially stalling concurrent incoming requests in ASGI frameworks like FastAPI if DNS resolution is slow.
 **Action:** When performing DNS validation in asynchronous endpoints, use `await asyncio.get_running_loop().getaddrinfo(...)` to offload the blocking call to the loop's default thread pool.
+
+## 2025-02-27 - Playwright Browser Instantiation Overhead
+**Learning:** During concurrent scraping of book details in `search_zlibrary` (via `get_book_info`), Playwright was instantiating multiple browser instances concurrently via `async_playwright().chromium.launch()`. Launching multiple full Chromium browsers added significant overhead, taking ~16 seconds compared to ~0.26s when reusing a single browser and context with multiple pages.
+**Action:** Share a single Playwright browser and context for batch operations, and use multiple `page`s for concurrency instead of launching multiple browsers when making concurrent scrape requests.

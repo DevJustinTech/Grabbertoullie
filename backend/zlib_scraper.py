@@ -201,34 +201,51 @@ async def get_book_info(book_url: str) -> dict:  # pyre-ignore
     Fetch a book's detail page and return a BookDetail dict.
     Automatically grabs the download URL.
     """
+    results = await get_book_info_batch([book_url])
+    if isinstance(results[0], Exception):
+        raise results[0]
+    return results[0]  # pyre-ignore
+
+async def get_book_info_batch(book_urls: list[str]) -> list[dict | Exception]:  # pyre-ignore
+    """
+    Fetch a batch of book detail pages concurrently using a single browser context.
+    """
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         )
-        page = await context.new_page()
+
+        async def _fetch_single(url: str):
+            page = await context.new_page()
+            try:
+                await page.goto(url, wait_until="domcontentloaded", timeout=20000)
+                try:
+                    await page.wait_for_selector(".addDownloadedBook", timeout=15000)
+                except Exception:
+                    pass
+
+                html = await page.content()
+                detail = _parse_book_detail(html, url)
+
+                # The download url might be a relative path, let's make it absolute based on the domain
+                from urllib.parse import urlparse
+                parsed_uri = urlparse(url)
+                base = f"{parsed_uri.scheme}://{parsed_uri.netloc}"
+
+                if detail["download_url"] and detail["download_url"].startswith("/"):
+                    detail["download_url"] = base + detail["download_url"]
+
+                return detail
+            except Exception as exc:
+                return ConnectionError(f"Cannot reach Z-Library detail page: {exc}")
+            finally:
+                await page.close()
 
         try:
-            await page.goto(book_url, wait_until="domcontentloaded", timeout=20000)
-            try:
-                await page.wait_for_selector(".addDownloadedBook", timeout=15000)
-            except Exception:
-                pass # Proceed anyway
-
-            html = await page.content()
-            detail = _parse_book_detail(html, book_url)
-
-            # The download url might be a relative path, let's make it absolute based on the domain
-            from urllib.parse import urlparse
-            parsed_uri = urlparse(book_url)
-            base = f"{parsed_uri.scheme}://{parsed_uri.netloc}"
-
-            if detail["download_url"] and detail["download_url"].startswith("/"):
-                detail["download_url"] = base + detail["download_url"]
-
-            return detail
-        except Exception as exc:
-            raise ConnectionError(f"Cannot reach Z-Library detail page: {exc}") from exc
+            tasks = [_fetch_single(url) for url in book_urls]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            return list(results)
         finally:
             await browser.close()
 
