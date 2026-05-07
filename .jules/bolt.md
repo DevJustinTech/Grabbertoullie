@@ -16,3 +16,6 @@
 ## 2024-05-04 - Unblocking Asyncio DNS Resolution
 **Learning:** `socket.getaddrinfo` is a synchronous system call in Python that blocks the entire asyncio event loop during execution, potentially stalling concurrent incoming requests in ASGI frameworks like FastAPI if DNS resolution is slow.
 **Action:** When performing DNS validation in asynchronous endpoints, use `await asyncio.get_running_loop().getaddrinfo(...)` to offload the blocking call to the loop's default thread pool.
+## 2024-05-15 - Standard Ebooks Search N+1 Refactor
+**Learning:** Found an N+1 HTTP query bottleneck in `search_standard_ebooks` where book detail pages were fetched sequentially inside a loop. This caused search latency to grow linearly with the number of top results found.
+**Action:** Always identify sequential network requests in loops. Extract the body into an async closure and use `asyncio.gather` to perform them concurrently, and include error handling per item so one failure doesn't abort the entire batch.

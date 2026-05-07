@@ -73,36 +73,44 @@ async def search_standard_ebooks(title: str) -> List[Dict[str, Any]]:
             soup = BeautifulSoup(resp.text, 'html.parser')
             items = soup.select('ol.ebooks-list li')
 
-            for item in items[:5]:
-                title_elem = item.select_one('p.title a')
-                author_elem = item.select_one('p.author a')
+            async def _fetch_book_info(item):
+                try:
+                    title_elem = item.select_one('p.title a')
+                    author_elem = item.select_one('p.author a')
 
-                if not title_elem: continue
+                    if not title_elem: return None
 
-                item_title = title_elem.text.strip()
-                item_author = author_elem.text.strip() if author_elem else ""
+                    item_title = title_elem.text.strip()
+                    item_author = author_elem.text.strip() if author_elem else ""
 
-                link = title_elem.get('href')
-                if not link: continue
+                    link = title_elem.get('href')
+                    if not link: return None
 
-                book_url = f"https://standardebooks.org{link}"
-                book_resp = await client.get(book_url)
-                book_resp.raise_for_status()
-                book_soup = BeautifulSoup(book_resp.text, 'html.parser')
+                    book_url = f"https://standardebooks.org{link}"
+                    book_resp = await client.get(book_url)
+                    book_resp.raise_for_status()
+                    book_soup = BeautifulSoup(book_resp.text, 'html.parser')
 
-                epub_link_elem = book_soup.select_one('a[href$=".epub"]')
-                if epub_link_elem:
-                    epub_url = f"https://standardebooks.org{epub_link_elem.get('href')}"
+                    epub_link_elem = book_soup.select_one('a[href$=".epub"]')
+                    if epub_link_elem:
+                        epub_url = f"https://standardebooks.org{epub_link_elem.get('href')}"
 
-                    results.append({
-                        "source": "Standard Ebooks",
-                        "title": item_title,
-                        "author": item_author,
-                        "year": "",
-                        "pdf_url": "",
-                        "epub_url": epub_url,
-                        "weight": 3
-                    })
+                        return {
+                            "source": "Standard Ebooks",
+                            "title": item_title,
+                            "author": item_author,
+                            "year": "",
+                            "pdf_url": "",
+                            "epub_url": epub_url,
+                            "weight": 3
+                        }
+                except Exception as e:
+                    logger.error(f"Failed to fetch Standard Ebooks item: {e}")
+                return None
+
+            # ⚡ Bolt: Concurrently fetch book info to fix N+1 query problem and reduce latency
+            fetched_results = await asyncio.gather(*[_fetch_book_info(item) for item in items[:5]])
+            results.extend([res for res in fetched_results if res is not None])
 
     except Exception as e:
         logger.error(f"Standard Ebooks search failed: {e}")
