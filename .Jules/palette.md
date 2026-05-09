@@ -19,3 +19,7 @@
 **Learning:** When adding global keyboard shortcuts (like `/` to search/focus) to a React application, it is important to prevent default behaviors but more critically, avoid intercepting the keystroke when a user is already typing in an input or textarea element. This ensures the shortcut does not break regular text entry. Additionally, visual hints using styled `<kbd>` tags provide a great way to introduce "power-user" features organically without overwhelming the layout.
 
 **Action:** Whenever implementing a global keyboard shortcut (e.g., using a window event listener inside a `useEffect`), always include a check against `document.activeElement?.tagName` to bypass the shortcut logic if the focus is on an interactive input field (`"INPUT"` or `"TEXTAREA"`).
+
+## 2024-05-10 - Use <form> for Chat Inputs
+**Learning:** For chat inputs, relying on `onKeyDown` to manually handle 'Enter' keys prematurely submits data for languages that use IME (Input Method Editor) compositions like Japanese or Chinese. Additionally, disabling the input field during loading states forcibly removes keyboard focus, creating a jarring experience.
+**Action:** Always wrap chat inputs in semantic `<form>` tags and use the native `onSubmit` event for submission. To prevent duplicate submissions during loading, keep the input enabled and handle concurrent submission guarding programmatically in the submit function.
