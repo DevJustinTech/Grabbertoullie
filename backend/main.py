@@ -9,6 +9,8 @@ from services.security import is_valid_url, check_url_hook
 import asyncio
 import socket
 import ipaddress
+import hmac
+import hashlib
 from pydantic import BaseModel  # type: ignore
 import httpx  # type: ignore
 import os
@@ -70,6 +72,7 @@ SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN")
 WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
+WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET")
 
 class ChatRequest(BaseModel):
     message: str
@@ -460,7 +463,27 @@ async def verify_webhook(request: Request):
 
 @app.post("/webhook")
 async def handle_webhook(request: Request):
-    body = await request.json()
+    raw_body = await request.body()
+
+    if WHATSAPP_APP_SECRET:
+        signature = request.headers.get("X-Hub-Signature-256")
+        if not signature:
+            raise HTTPException(status_code=401, detail="Missing signature")
+
+        expected_signature = hmac.new(
+            WHATSAPP_APP_SECRET.encode(),
+            raw_body,
+            hashlib.sha256
+        ).hexdigest()
+        expected_signature = f"sha256={expected_signature}"
+
+        if not hmac.compare_digest(expected_signature, signature):
+            raise HTTPException(status_code=401, detail="Invalid signature")
+
+    try:
+        body = json.loads(raw_body)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
 
     if body.get("object") == "whatsapp_business_account":
         for entry in body.get("entry", []):
