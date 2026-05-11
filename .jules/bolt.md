@@ -16,3 +16,7 @@
 ## 2024-05-04 - Unblocking Asyncio DNS Resolution
 **Learning:** `socket.getaddrinfo` is a synchronous system call in Python that blocks the entire asyncio event loop during execution, potentially stalling concurrent incoming requests in ASGI frameworks like FastAPI if DNS resolution is slow.
 **Action:** When performing DNS validation in asynchronous endpoints, use `await asyncio.get_running_loop().getaddrinfo(...)` to offload the blocking call to the loop's default thread pool.
+
+## 2024-05-18 - React.memo Pitfall with Dynamic Inline Handlers
+**Learning:** Extracting components into `React.memo` to prevent re-renders (like `MessageItem` in a chat map) is completely defeated if the event handlers passed to them (like `sendMessage`) are re-created on every render cycle by the parent. React sees the new function reference as a changed prop and re-renders the child anyway.
+**Action:** Always pair `React.memo` on child components with `useCallback` on the event handlers passed from the parent. Be careful with the dependency array of `useCallback`—if it relies on rapidly changing state, it will still recreate the function. Use functional state updates (e.g., `setMessages(prev => ...)`) to avoid adding state variables to the dependency array.
