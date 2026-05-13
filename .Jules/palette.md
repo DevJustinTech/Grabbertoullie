@@ -19,3 +19,9 @@
 **Learning:** When adding global keyboard shortcuts (like `/` to search/focus) to a React application, it is important to prevent default behaviors but more critically, avoid intercepting the keystroke when a user is already typing in an input or textarea element. This ensures the shortcut does not break regular text entry. Additionally, visual hints using styled `<kbd>` tags provide a great way to introduce "power-user" features organically without overwhelming the layout.
 
 **Action:** Whenever implementing a global keyboard shortcut (e.g., using a window event listener inside a `useEffect`), always include a check against `document.activeElement?.tagName` to bypass the shortcut logic if the focus is on an interactive input field (`"INPUT"` or `"TEXTAREA"`).
+
+## 2025-03-05 - Native IME Support & Focus Preservation
+
+**Learning:** When users compose text in languages like Japanese or Chinese using an Input Method Editor (IME), pressing 'Enter' to confirm characters can inadvertently trigger custom `onKeyDown` listeners and cause premature form submissions. Additionally, forcibly disabling input fields during loading states strips keyboard focus away from the user, degrading accessibility.
+
+**Action:** Wrap inputs and buttons inside semantic `<form>` tags and handle submissions natively via `onSubmit`. This defers to the browser's built-in IME handling, which suppresses 'Enter' keys during composition. Instead of disabling inputs during loading (`disabled={loading}`), keep the input enabled to maintain focus and use a programmatic guard (`if (loading) return;`) within the submit handler.
