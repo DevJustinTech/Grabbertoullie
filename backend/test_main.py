@@ -1,3 +1,4 @@
+from httpx import AsyncClient, ASGITransport
 import pytest
 from httpx import AsyncClient, ASGITransport
 from main import app
@@ -52,3 +53,48 @@ async def test_is_valid_url():
 async def test_is_invalid_url():
     valid, reason = await is_valid_url("http://localhost")
     assert not valid
+
+import hmac
+import hashlib
+import json
+import main
+
+@pytest.mark.asyncio
+async def test_webhook_signature_verification(monkeypatch):
+    monkeypatch.setenv("WHATSAPP_APP_SECRET", "test_secret")
+
+    # Reload the main module to pick up the new environment variable
+    import sys
+    import importlib
+
+    # We must cleanly reload main, but wait... fastapi app is already initialized.
+    # Let's just mock the variable directly in the module for this test.
+    monkeypatch.setattr(main, "WHATSAPP_APP_SECRET", "test_secret")
+
+    transport = ASGITransport(app=main.app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        payload = {"object": "whatsapp_business_account", "entry": []}
+        raw_payload = json.dumps(payload).encode("utf-8")
+
+        # Test 1: Missing signature
+        response = await ac.post("/webhook", content=raw_payload)
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Missing signature"
+
+        # Test 2: Invalid signature
+        headers = {"X-Hub-Signature-256": "sha256=invalid"}
+        response = await ac.post("/webhook", content=raw_payload, headers=headers)
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Invalid signature"
+
+        # Test 3: Valid signature
+        expected_signature = hmac.new(
+            "test_secret".encode("utf-8"),
+            raw_payload,
+            hashlib.sha256
+        ).hexdigest()
+
+        headers = {"X-Hub-Signature-256": f"sha256={expected_signature}"}
+        response = await ac.post("/webhook", content=raw_payload, headers=headers)
+        assert response.status_code == 200
+        assert response.text == "EVENT_RECEIVED"

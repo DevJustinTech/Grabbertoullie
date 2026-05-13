@@ -70,6 +70,7 @@ SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN")
 WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
+WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET")
 
 class ChatRequest(BaseModel):
     message: str
@@ -458,8 +459,26 @@ async def verify_webhook(request: Request):
             raise HTTPException(status_code=403, detail="Verification failed")
     return Response(content="Hello", status_code=200)
 
+import hmac
+import hashlib
+
 @app.post("/webhook")
 async def handle_webhook(request: Request):
+    raw_body = await request.body()
+    signature_header = request.headers.get("X-Hub-Signature-256")
+
+    if WHATSAPP_APP_SECRET and signature_header:
+        expected_signature = hmac.new(
+            WHATSAPP_APP_SECRET.encode("utf-8"),
+            raw_body,
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(f"sha256={expected_signature}", signature_header):
+            raise HTTPException(status_code=403, detail="Invalid signature")
+    elif WHATSAPP_APP_SECRET and not signature_header:
+        raise HTTPException(status_code=403, detail="Missing signature")
+
     body = await request.json()
 
     if body.get("object") == "whatsapp_business_account":
