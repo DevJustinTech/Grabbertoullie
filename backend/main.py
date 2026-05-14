@@ -18,6 +18,8 @@ from typing import Tuple
 from urllib.parse import urlparse
 from dotenv import load_dotenv  # type: ignore
 import re
+import hmac
+import hashlib
 
 # explicitly load the .env from the backend/ directory so it is found regardless of cwd
 backend_dir = os.path.dirname(os.path.abspath(__file__))
@@ -70,6 +72,7 @@ SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN")
 WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
+WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET")
 
 class ChatRequest(BaseModel):
     message: str
@@ -460,6 +463,21 @@ async def verify_webhook(request: Request):
 
 @app.post("/webhook")
 async def handle_webhook(request: Request):
+    if WHATSAPP_APP_SECRET:
+        raw_body = await request.body()
+        signature = request.headers.get("x-hub-signature-256")
+        if not signature:
+            raise HTTPException(status_code=403, detail="Missing signature")
+
+        expected_sig = hmac.new(
+            WHATSAPP_APP_SECRET.encode("utf-8"),
+            raw_body,
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(signature, f"sha256={expected_sig}"):
+            raise HTTPException(status_code=403, detail="Invalid signature")
+
     body = await request.json()
 
     if body.get("object") == "whatsapp_business_account":
