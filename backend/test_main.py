@@ -1,5 +1,7 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
+import hmac
+import hashlib
 from main import app
 
 @pytest.mark.asyncio
@@ -52,3 +54,41 @@ async def test_is_valid_url():
 async def test_is_invalid_url():
     valid, reason = await is_valid_url("http://localhost")
     assert not valid
+
+@pytest.mark.asyncio
+async def test_webhook_signature_missing(monkeypatch):
+    monkeypatch.setattr("main.WHATSAPP_APP_SECRET", "test_secret")
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.post("/webhook", json={"object": "whatsapp_business_account"})
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Missing signature"
+
+@pytest.mark.asyncio
+async def test_webhook_signature_invalid(monkeypatch):
+    monkeypatch.setattr("main.WHATSAPP_APP_SECRET", "test_secret")
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        headers = {"X-Hub-Signature-256": "sha256=invalid_signature"}
+        response = await ac.post("/webhook", json={"object": "whatsapp_business_account"}, headers=headers)
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Invalid signature"
+
+@pytest.mark.asyncio
+async def test_webhook_signature_valid(monkeypatch):
+    monkeypatch.setattr("main.WHATSAPP_APP_SECRET", "test_secret")
+    payload = b'{"object": "whatsapp_business_account"}'
+
+    expected_signature = hmac.new(
+        b"test_secret",
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+
+    headers = {"X-Hub-Signature-256": f"sha256={expected_signature}"}
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.post("/webhook", content=payload, headers=headers)
+        assert response.status_code == 200
+        assert response.text == "EVENT_RECEIVED"
