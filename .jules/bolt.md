@@ -16,3 +16,6 @@
 ## 2024-05-04 - Unblocking Asyncio DNS Resolution
 **Learning:** `socket.getaddrinfo` is a synchronous system call in Python that blocks the entire asyncio event loop during execution, potentially stalling concurrent incoming requests in ASGI frameworks like FastAPI if DNS resolution is slow.
 **Action:** When performing DNS validation in asynchronous endpoints, use `await asyncio.get_running_loop().getaddrinfo(...)` to offload the blocking call to the loop's default thread pool.
+## 2024-05-18 - [Frontend React Rendering]
+**Learning:** React components containing arrays of mapped JSX elements that are attached to state updates (e.g. streaming chat interfaces) can cause significant UI thread blocking. On each incoming Server-Sent Event chunk, the entire array is reconstructed, causing a full diff.
+**Action:** Always extract inner list items to standalone components wrapped in `React.memo` and wrap all functions passed as props in `useCallback` to prevent the heavy O(n) re-render cost during highly frequent state updates like network streams.

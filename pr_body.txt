@@ -1,0 +1,4 @@
+💡 What: Extracted the inline message rendering logic in `page.tsx` into a standalone `MessageItem` component wrapped in `React.memo`, and wrapped `sendMessage`, `handleSendMessage`, and `handleDownload` in `useCallback`.
+🎯 Why: To prevent the entire message list from re-rendering on every keystroke in the input field or during frequent state updates from incoming Server-Sent Events (SSE).
+📊 Impact: Reduces unnecessary re-renders of the message array to zero during typing, significantly improving input responsiveness on long chat histories.
+🔬 Measurement: Use React Developer Tools Profiler to observe component render cycles during typing and SSE streaming. `MessageItem` components will now bail out of rendering.
