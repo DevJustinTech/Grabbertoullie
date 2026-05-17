@@ -52,3 +52,43 @@ async def test_is_valid_url():
 async def test_is_invalid_url():
     valid, reason = await is_valid_url("http://localhost")
     assert not valid
+
+import json
+import hmac
+import hashlib
+import main
+
+@pytest.mark.asyncio
+async def test_webhook_signature_validation(monkeypatch):
+    monkeypatch.setattr(main, "WHATSAPP_APP_SECRET", "test_secret")
+
+    payload = {"object": "whatsapp_business_account"}
+    raw_payload = json.dumps(payload).encode('utf-8')
+
+    expected_signature = hmac.new(
+        "test_secret".encode("utf-8"),
+        raw_payload,
+        hashlib.sha256
+    ).hexdigest()
+
+    valid_headers = {
+        "X-Hub-Signature-256": f"sha256={expected_signature}",
+        "Content-Type": "application/json"
+    }
+
+    invalid_headers = {
+        "X-Hub-Signature-256": "sha256=invalid_signature",
+        "Content-Type": "application/json"
+    }
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        # Valid signature should return 200 EVENT_RECEIVED
+        response = await ac.post("/webhook", content=raw_payload, headers=valid_headers)
+        assert response.status_code == 200
+        assert response.text == "EVENT_RECEIVED"
+
+        # Invalid signature should raise 403
+        response = await ac.post("/webhook", content=raw_payload, headers=invalid_headers)
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Invalid signature"
