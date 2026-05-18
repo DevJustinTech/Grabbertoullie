@@ -25,3 +25,8 @@
 **Vulnerability:** Fast API string exceptions were leaked directly to the client via `HTTPException` detail fields and server-sent events (SSE). In addition, dynamically resolved `Content-Disposition` filenames in the download proxy lacked sanitization, creating an HTTP header injection and unescaped quotes vulnerability.
 **Learning:** Due to how FastAPI and Python format raw exceptions as strings (`str(e)`), raising `HTTPException(detail=str(e))` inherently leaks sensitive internal states or trace paths to the end user. Furthermore, proxying content dynamically requires sanitizing headers since variables implicitly injected without escaping create header injection risks.
 **Prevention:** Do not return explicit stack trace details via generic exception blocks. Instead, log the raw exception internally and map the response to a safe user-facing message. When building headers, aggressively strip characters like `\n`, `\r`, and `"` using `re.sub(r'[\r\n"]', '_', filename)`.
+
+## 2024-05-18 - Webhook Signature Validation Missing
+**Vulnerability:** The WhatsApp webhook endpoint (`POST /webhook`) did not validate the `X-Hub-Signature-256` header to ensure incoming requests were authenticated.
+**Learning:** Incoming webhooks in FastAPI must validate HMAC signatures using the raw body bytes (`await request.body()`) before decoding or parsing the JSON (`await request.json()`), otherwise it will lead to an authentication bypass vulnerability.
+**Prevention:** Always authenticate webhook sources and avoid parsing body data before signature verification, as parsing can subtly modify payload bytes.
