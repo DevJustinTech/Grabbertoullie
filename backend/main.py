@@ -92,7 +92,7 @@ async def search_web(query: str) -> dict:  # type: ignore[return]
         'X-API-KEY': SERPER_API_KEY,
         'Content-Type': 'application/json'
     }
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=60.0, event_hooks={"request": [check_url_hook]}) as client:
         try:
             response = await client.post(url, headers=headers, content=payload)
             response.raise_for_status()
@@ -161,7 +161,7 @@ Return JSON ONLY, with a single key "search_query" containing your exact advance
         "response_format": {"type": "json_object"}
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=60.0, event_hooks={"request": [check_url_hook]}) as client:
         try:
             resp1 = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload1)
             resp1.raise_for_status()
@@ -214,7 +214,7 @@ Or if TRULY not found after exhaustive check:
         "response_format": {"type": "json_object"}
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=60.0, event_hooks={"request": [check_url_hook]}) as client:
         try:
             resp2 = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload2)
             resp2.raise_for_status()
@@ -499,7 +499,7 @@ async def process_whatsapp_message(phone_number: str, text: str):
             # Check file size if possible, or attempt to download and send
             # For simplicity, we'll try to get the headers first to check size
             try:
-                async with httpx.AsyncClient(timeout=60.0) as client:
+                async with httpx.AsyncClient(timeout=60.0, event_hooks={"request": [check_url_hook]}) as client:
                     head_resp = await client.head(file_url, follow_redirects=True)
                     content_length = int(head_resp.headers.get("content-length", 0))
 
@@ -536,7 +536,7 @@ async def send_whatsapp_text(to: str, text: str):
         "type": "text",
         "text": {"body": text}
     }
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=60.0, event_hooks={"request": [check_url_hook]}) as client:
         await client.post(url, headers=headers, json=payload)
 
 async def send_whatsapp_document(to: str, document_url: str, filename: str):
@@ -554,7 +554,7 @@ async def send_whatsapp_document(to: str, document_url: str, filename: str):
             "filename": filename
         }
     }
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=60.0, event_hooks={"request": [check_url_hook]}) as client:
         await client.post(url, headers=headers, json=payload)
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ import asyncio
 from typing import Dict, Any, List, Optional, Tuple
 from bs4 import BeautifulSoup # type: ignore
 from zlib_scraper import search_books, get_book_info
+from services.security import check_url_hook
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ async def search_open_library(title: str, author: str = "") -> List[Dict[str, An
     url = f"https://openlibrary.org/search.json?{'&'.join(query)}&limit=5"
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, event_hooks={"request": [check_url_hook]}) as client:
             resp = await client.get(url)
             resp.raise_for_status()
             data = resp.json()
@@ -66,7 +67,7 @@ async def search_standard_ebooks(title: str) -> List[Dict[str, Any]]:
     url = f"https://standardebooks.org/ebooks?query={title.replace(' ', '+')}"
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, event_hooks={"request": [check_url_hook]}) as client:
             resp = await client.get(url)
             resp.raise_for_status()
 
@@ -126,7 +127,7 @@ async def search_project_gutenberg(title: str, author: str = "") -> List[Dict[st
     url = f"https://gutendex.com/books?search={query_str.replace(' ', '%20')}"
 
     try:
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, event_hooks={"request": [check_url_hook]}) as client:
             resp = await client.get(url)
             resp.raise_for_status()
             data = resp.json()
@@ -180,7 +181,7 @@ async def search_semantic_scholar(title: str, author: str = "") -> List[Dict[str
     url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={query_str.replace(' ', '%20')}&fields=title,authors,year,isOpenAccess,openAccessPdf&limit=5"
 
     try:
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True, event_hooks={"request": [check_url_hook]}) as client:
             resp = await client.get(url)
 
             if resp.status_code == 429:
@@ -313,7 +314,7 @@ async def search_serper_fallback(query: str, serper_api_key: str) -> List[Dict[s
     }
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, event_hooks={"request": [check_url_hook]}) as client:
             response = await client.post(url, headers=headers, content=payload)
             response.raise_for_status()
             data = response.json()

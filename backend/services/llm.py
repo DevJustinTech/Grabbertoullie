@@ -5,6 +5,7 @@ import logging
 # pyre-ignore[21]
 import httpx
 from typing import Dict, Any
+from services.security import check_url_hook
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +128,7 @@ You must output ONLY valid JSON in this exact structure:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=60.0, event_hooks={"request": [check_url_hook]}) as client:
             resp = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
             resp.raise_for_status()
             res_json = resp.json()

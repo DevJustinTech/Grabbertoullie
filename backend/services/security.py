@@ -25,7 +25,7 @@ def is_valid_url(url: str) -> Tuple[bool, str]:
             for res in addr_info:
                 ip = res[4][0]
                 ip_obj = ipaddress.ip_address(ip)
-                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_multicast or ip_obj.is_reserved or ip_obj.is_link_local:
+                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_multicast or ip_obj.is_reserved or ip_obj.is_link_local or ip_obj.is_unspecified or not ip_obj.is_global:
                     return False, "Invalid or restricted URL domain/IP."
         except socket.gaierror:
             # DNS resolution failed or invalid format like octal/decimal IP that getaddrinfo rejects
