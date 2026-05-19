@@ -58,7 +58,7 @@ export default function Home() {
   }, []);
 
   const handleSendMessage = (text: string) => {
-    if (!text.trim()) return;
+    if (loading || !text.trim()) return;
     sendMessage(text.trim());
   };
 
@@ -272,20 +272,24 @@ export default function Home() {
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent pb-6 pt-10 px-4">
-        <div className="max-w-3xl mx-auto relative shadow-lg shadow-black/5 rounded-full">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSendMessage(input);
+          }}
+          className="max-w-3xl mx-auto relative shadow-lg shadow-black/5 rounded-full"
+        >
           <input
             ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSendMessage(input)}
             placeholder="Type your request here..."
             aria-label="Search for a book"
             className="w-full bg-white border border-zinc-200 shadow-sm rounded-full pl-6 pr-14 py-4 focus:outline-none focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100 transition-all text-zinc-800 placeholder:text-zinc-400 text-[15px]"
-            disabled={loading}
           />
           <button
-            onClick={() => handleSendMessage(input)}
+            type="submit"
             disabled={loading || !input.trim()}
             aria-label={loading ? "Sending request" : "Send request"}
             className="absolute right-2 top-2 bottom-2 bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full w-10 flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
@@ -301,7 +305,7 @@ export default function Home() {
               </svg>
             )}
           </button>
-        </div>
+        </form>
         <p className="text-center text-[11px] text-zinc-400 mt-3 font-medium flex items-center justify-center gap-1.5 flex-wrap">
           Press <kbd className="px-1.5 py-0.5 text-[10px] font-sans bg-zinc-100 border border-zinc-200 text-zinc-500 rounded-md">Enter</kbd> to send.
           Press <kbd className="px-1.5 py-0.5 text-[10px] font-sans bg-zinc-100 border border-zinc-200 text-zinc-500 rounded-md">/</kbd> to search.
