@@ -52,3 +52,58 @@ async def test_is_valid_url():
 async def test_is_invalid_url():
     valid, reason = await is_valid_url("http://localhost")
     assert not valid
+
+import hmac
+import hashlib
+
+@pytest.mark.asyncio
+async def test_webhook_signature_missing():
+    transport = ASGITransport(app=app)
+    # Patch WHATSAPP_APP_SECRET at the module level in main
+    import main
+    original_secret = main.WHATSAPP_APP_SECRET
+    main.WHATSAPP_APP_SECRET = "test_secret"
+    try:
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            response = await ac.post("/webhook", json={"object": "whatsapp_business_account"})
+            assert response.status_code == 401
+            assert "Missing signature" in response.json()["detail"]
+    finally:
+        main.WHATSAPP_APP_SECRET = original_secret
+
+@pytest.mark.asyncio
+async def test_webhook_signature_invalid():
+    transport = ASGITransport(app=app)
+    import main
+    original_secret = main.WHATSAPP_APP_SECRET
+    main.WHATSAPP_APP_SECRET = "test_secret"
+    try:
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            headers = {"x-hub-signature-256": "sha256=invalid_signature"}
+            response = await ac.post("/webhook", json={"object": "whatsapp_business_account"}, headers=headers)
+            assert response.status_code == 401
+            assert "Invalid signature" in response.json()["detail"]
+    finally:
+        main.WHATSAPP_APP_SECRET = original_secret
+
+@pytest.mark.asyncio
+async def test_webhook_signature_valid():
+    transport = ASGITransport(app=app)
+    import main
+    original_secret = main.WHATSAPP_APP_SECRET
+    main.WHATSAPP_APP_SECRET = "test_secret"
+    try:
+        payload = b'{"object":"whatsapp_business_account","entry":[]}'
+        expected_signature = hmac.new(
+            "test_secret".encode("utf-8"),
+            payload,
+            hashlib.sha256
+        ).hexdigest()
+
+        headers = {"x-hub-signature-256": f"sha256={expected_signature}"}
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            response = await ac.post("/webhook", content=payload, headers=headers)
+            assert response.status_code == 200
+            assert response.text == "EVENT_RECEIVED"
+    finally:
+        main.WHATSAPP_APP_SECRET = original_secret
