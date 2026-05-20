@@ -16,3 +16,7 @@
 ## 2024-05-04 - Unblocking Asyncio DNS Resolution
 **Learning:** `socket.getaddrinfo` is a synchronous system call in Python that blocks the entire asyncio event loop during execution, potentially stalling concurrent incoming requests in ASGI frameworks like FastAPI if DNS resolution is slow.
 **Action:** When performing DNS validation in asynchronous endpoints, use `await asyncio.get_running_loop().getaddrinfo(...)` to offload the blocking call to the loop's default thread pool.
+
+## 2024-05-27 - React.memo() with Anonymous Functions in Next.js
+**Learning:** When extracting anonymous functional components to use with `React.memo()` in a Next.js environment, the ESLint `react/display-name` rule will cause the build to fail if a display name is not provided.
+**Action:** Always explicitly assign a `displayName` property to the component (e.g., `MessageItem.displayName = "MessageItem";`) when wrapping anonymous functions with `React.memo()` to ensure `pnpm build` succeeds.
