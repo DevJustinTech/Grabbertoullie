@@ -16,3 +16,7 @@
 ## 2024-05-04 - Unblocking Asyncio DNS Resolution
 **Learning:** `socket.getaddrinfo` is a synchronous system call in Python that blocks the entire asyncio event loop during execution, potentially stalling concurrent incoming requests in ASGI frameworks like FastAPI if DNS resolution is slow.
 **Action:** When performing DNS validation in asynchronous endpoints, use `await asyncio.get_running_loop().getaddrinfo(...)` to offload the blocking call to the loop's default thread pool.
+
+## 2024-06-25 - Preventing Chat List Re-Renders
+**Learning:** In a highly interactive chat interface (like `frontend/src/app/page.tsx`), keeping component states (like the typing `input`) and large arrays (like `messages`) in the same component can cause severe re-rendering issues. Typing in the input field re-rendered the entire message list continuously because the `map` callback passed un-memoized handlers (`handleSendMessage`, `handleDownload`) and created anonymous element structures.
+**Action:** Extract list items into memoized components (`React.memo` with a `displayName`), and ensure all callback handlers passed to them are wrapped in `useCallback` with stable dependencies to prevent unnecessary React rendering cycles on every keystroke.
