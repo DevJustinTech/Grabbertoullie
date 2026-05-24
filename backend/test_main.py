@@ -52,3 +52,49 @@ async def test_is_valid_url():
 async def test_is_invalid_url():
     valid, reason = await is_valid_url("http://localhost")
     assert not valid
+
+@pytest.fixture
+def mock_whatsapp_secret(monkeypatch):
+    import main
+    monkeypatch.setattr(main, "WHATSAPP_APP_SECRET", "test_secret")
+
+@pytest.mark.asyncio
+async def test_webhook_missing_signature(mock_whatsapp_secret):
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.post("/webhook", json={"object": "whatsapp_business_account"})
+        assert response.status_code == 403
+        assert "Missing signature" in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_webhook_invalid_signature(mock_whatsapp_secret):
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        headers = {"X-Hub-Signature-256": "sha256=invalid_signature"}
+        response = await ac.post("/webhook", json={"object": "whatsapp_business_account"}, headers=headers)
+        assert response.status_code == 403
+        assert "Invalid signature" in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_webhook_valid_signature(mock_whatsapp_secret):
+    import hmac
+    import hashlib
+    import json
+
+    payload = {"object": "whatsapp_business_account", "entry": []}
+    # fastapi's TestClient serializes json by taking dict and encoding it via json.dumps with no spaces
+    # so we encode exactly the same way to generate the signature
+    raw_body = json.dumps(payload).encode("utf-8")
+
+    expected_signature = hmac.new(
+        b"test_secret",
+        raw_body,
+        hashlib.sha256
+    ).hexdigest()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        headers = {"X-Hub-Signature-256": f"sha256={expected_signature}"}
+        # Instead of json=payload, use content=raw_body to ensure exact serialization
+        response = await ac.post("/webhook", content=raw_body, headers=headers)
+        assert response.status_code == 200
