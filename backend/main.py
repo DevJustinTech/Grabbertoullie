@@ -14,6 +14,8 @@ import httpx  # type: ignore
 import os
 import json
 import logging
+import hmac
+import hashlib
 from typing import Tuple
 from urllib.parse import urlparse
 from dotenv import load_dotenv  # type: ignore
@@ -70,6 +72,7 @@ SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN")
 WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
+WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET")
 
 class ChatRequest(BaseModel):
     message: str
@@ -460,6 +463,22 @@ async def verify_webhook(request: Request):
 
 @app.post("/webhook")
 async def handle_webhook(request: Request):
+    raw_body = await request.body()
+
+    if WHATSAPP_APP_SECRET:
+        signature_header = request.headers.get("x-hub-signature-256")
+        if not signature_header:
+            raise HTTPException(status_code=403, detail="Missing signature")
+
+        expected_signature = hmac.new(
+            WHATSAPP_APP_SECRET.encode("utf-8"),
+            raw_body,
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(f"sha256={expected_signature}", signature_header):
+            raise HTTPException(status_code=403, detail="Invalid signature")
+
     body = await request.json()
 
     if body.get("object") == "whatsapp_business_account":
