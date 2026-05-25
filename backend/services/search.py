@@ -7,8 +7,12 @@ import asyncio
 from typing import Dict, Any, List, Optional, Tuple
 from bs4 import BeautifulSoup # type: ignore
 from zlib_scraper import search_books, get_book_info
+from services.security import check_url_hook
 
 logger = logging.getLogger(__name__)
+
+# Shared client to prevent connection pooling and instantiation overhead
+_shared_client = httpx.AsyncClient(follow_redirects=True, event_hooks={"request": [check_url_hook]})
 
 WORD_RE = re.compile(r'\w+')
 
@@ -28,31 +32,30 @@ async def search_open_library(title: str, author: str = "") -> List[Dict[str, An
     url = f"https://openlibrary.org/search.json?{'&'.join(query)}&limit=5"
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            data = resp.json()
+        resp = await _shared_client.get(url, timeout=10.0)
+        resp.raise_for_status()
+        data = resp.json()
 
-            for doc in data.get("docs", []):
-                has_fulltext = doc.get("has_fulltext", False)
-                ia_ids = doc.get("ia", [])
+        for doc in data.get("docs", []):
+            has_fulltext = doc.get("has_fulltext", False)
+            ia_ids = doc.get("ia", [])
 
-                if not ia_ids:
-                    continue
+            if not ia_ids:
+                continue
 
-                for ia_id in ia_ids[:2]:
-                    pdf_url = f"https://archive.org/download/{ia_id}/{ia_id}.pdf"
-                    epub_url = f"https://archive.org/download/{ia_id}/{ia_id}.epub"
+            for ia_id in ia_ids[:2]:
+                pdf_url = f"https://archive.org/download/{ia_id}/{ia_id}.pdf"
+                epub_url = f"https://archive.org/download/{ia_id}/{ia_id}.epub"
 
-                    results.append({
-                        "source": "Open Library",
-                        "title": doc.get("title", ""),
-                        "author": doc.get("author_name", [""])[0] if doc.get("author_name") else "",
-                        "year": str(doc.get("first_publish_year", "")),
-                        "pdf_url": pdf_url,
-                        "epub_url": epub_url,
-                        "weight": 2
-                    })
+                results.append({
+                    "source": "Open Library",
+                    "title": doc.get("title", ""),
+                    "author": doc.get("author_name", [""])[0] if doc.get("author_name") else "",
+                    "year": str(doc.get("first_publish_year", "")),
+                    "pdf_url": pdf_url,
+                    "epub_url": epub_url,
+                    "weight": 2
+                })
 
     except Exception as e:
         logger.error(f"Open Library search failed: {e}")
@@ -66,43 +69,42 @@ async def search_standard_ebooks(title: str) -> List[Dict[str, Any]]:
     url = f"https://standardebooks.org/ebooks?query={title.replace(' ', '+')}"
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
+        resp = await _shared_client.get(url, timeout=10.0)
+        resp.raise_for_status()
 
-            soup = BeautifulSoup(resp.text, 'html.parser')
-            items = soup.select('ol.ebooks-list li')
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        items = soup.select('ol.ebooks-list li')
 
-            for item in items[:5]:
-                title_elem = item.select_one('p.title a')
-                author_elem = item.select_one('p.author a')
+        for item in items[:5]:
+            title_elem = item.select_one('p.title a')
+            author_elem = item.select_one('p.author a')
 
-                if not title_elem: continue
+            if not title_elem: continue
 
-                item_title = title_elem.text.strip()
-                item_author = author_elem.text.strip() if author_elem else ""
+            item_title = title_elem.text.strip()
+            item_author = author_elem.text.strip() if author_elem else ""
 
-                link = title_elem.get('href')
-                if not link: continue
+            link = title_elem.get('href')
+            if not link: continue
 
-                book_url = f"https://standardebooks.org{link}"
-                book_resp = await client.get(book_url)
-                book_resp.raise_for_status()
-                book_soup = BeautifulSoup(book_resp.text, 'html.parser')
+            book_url = f"https://standardebooks.org{link}"
+            book_resp = await _shared_client.get(book_url, timeout=10.0)
+            book_resp.raise_for_status()
+            book_soup = BeautifulSoup(book_resp.text, 'html.parser')
 
-                epub_link_elem = book_soup.select_one('a[href$=".epub"]')
-                if epub_link_elem:
-                    epub_url = f"https://standardebooks.org{epub_link_elem.get('href')}"
+            epub_link_elem = book_soup.select_one('a[href$=".epub"]')
+            if epub_link_elem:
+                epub_url = f"https://standardebooks.org{epub_link_elem.get('href')}"
 
-                    results.append({
-                        "source": "Standard Ebooks",
-                        "title": item_title,
-                        "author": item_author,
-                        "year": "",
-                        "pdf_url": "",
-                        "epub_url": epub_url,
-                        "weight": 3
-                    })
+                results.append({
+                    "source": "Standard Ebooks",
+                    "title": item_title,
+                    "author": item_author,
+                    "year": "",
+                    "pdf_url": "",
+                    "epub_url": epub_url,
+                    "weight": 3
+                })
 
     except Exception as e:
         logger.error(f"Standard Ebooks search failed: {e}")
@@ -126,37 +128,36 @@ async def search_project_gutenberg(title: str, author: str = "") -> List[Dict[st
     url = f"https://gutendex.com/books?search={query_str.replace(' ', '%20')}"
 
     try:
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            data = resp.json()
+        resp = await _shared_client.get(url, timeout=15.0)
+        resp.raise_for_status()
+        data = resp.json()
 
-            for book in data.get("results", [])[:5]:
-                book_title = book.get("title", "")
-                authors = [a.get("name", "") for a in book.get("authors", [])]
-                book_author = authors[0] if authors else ""
+        for book in data.get("results", [])[:5]:
+            book_title = book.get("title", "")
+            authors = [a.get("name", "") for a in book.get("authors", [])]
+            book_author = authors[0] if authors else ""
 
-                formats = book.get("formats", {})
+            formats = book.get("formats", {})
 
-                epub_url = formats.get("application/epub+zip")
-                if not epub_url:
-                    for key, val in formats.items():
-                        if "epub" in key:
-                            epub_url = val
-                            break
+            epub_url = formats.get("application/epub+zip")
+            if not epub_url:
+                for key, val in formats.items():
+                    if "epub" in key:
+                        epub_url = val
+                        break
 
-                pdf_url = formats.get("application/pdf", "")
+            pdf_url = formats.get("application/pdf", "")
 
-                if epub_url or pdf_url:
-                    results.append({
-                        "source": "Project Gutenberg",
-                        "title": book_title,
-                        "author": book_author,
-                        "year": "",
-                        "pdf_url": pdf_url,
-                        "epub_url": epub_url,
-                        "weight": 3
-                    })
+            if epub_url or pdf_url:
+                results.append({
+                    "source": "Project Gutenberg",
+                    "title": book_title,
+                    "author": book_author,
+                    "year": "",
+                    "pdf_url": pdf_url,
+                    "epub_url": epub_url,
+                    "weight": 3
+                })
 
     except Exception as e:
         logger.error(f"Project Gutenberg search failed: {e}")
@@ -180,36 +181,35 @@ async def search_semantic_scholar(title: str, author: str = "") -> List[Dict[str
     url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={query_str.replace(' ', '%20')}&fields=title,authors,year,isOpenAccess,openAccessPdf&limit=5"
 
     try:
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-            resp = await client.get(url)
+        resp = await _shared_client.get(url, timeout=10.0)
 
-            if resp.status_code == 429:
-                logger.warning("Semantic Scholar rate limit hit, skipping.")
-                return results
+        if resp.status_code == 429:
+            logger.warning("Semantic Scholar rate limit hit, skipping.")
+            return results
 
-            resp.raise_for_status()
-            data = resp.json()
+        resp.raise_for_status()
+        data = resp.json()
 
-            for paper in data.get("data", []):
-                if paper.get("isOpenAccess"):
-                    pdf_info = paper.get("openAccessPdf")
-                    pdf_url = pdf_info.get("url") if pdf_info else ""
+        for paper in data.get("data", []):
+            if paper.get("isOpenAccess"):
+                pdf_info = paper.get("openAccessPdf")
+                pdf_url = pdf_info.get("url") if pdf_info else ""
 
-                    if pdf_url:
-                        paper_title = paper.get("title", "")
-                        authors = [a.get("name", "") for a in paper.get("authors", [])]
-                        paper_author = authors[0] if authors else ""
-                        year = str(paper.get("year", ""))
+                if pdf_url:
+                    paper_title = paper.get("title", "")
+                    authors = [a.get("name", "") for a in paper.get("authors", [])]
+                    paper_author = authors[0] if authors else ""
+                    year = str(paper.get("year", ""))
 
-                        results.append({
-                            "source": "Semantic Scholar",
-                            "title": paper_title,
-                            "author": paper_author,
-                            "year": year,
-                            "pdf_url": pdf_url,
-                            "epub_url": "",
-                            "weight": 2
-                        })
+                    results.append({
+                        "source": "Semantic Scholar",
+                        "title": paper_title,
+                        "author": paper_author,
+                        "year": year,
+                        "pdf_url": pdf_url,
+                        "epub_url": "",
+                        "weight": 2
+                    })
 
     except Exception as e:
         logger.error(f"Semantic Scholar search failed: {e}")
@@ -313,24 +313,23 @@ async def search_serper_fallback(query: str, serper_api_key: str) -> List[Dict[s
     }
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(url, headers=headers, content=payload)
-            response.raise_for_status()
-            data = response.json()
+        response = await _shared_client.post(url, headers=headers, content=payload, timeout=10.0)
+        response.raise_for_status()
+        data = response.json()
 
-            for item in data.get("organic", [])[:5]:
-                link = item.get("link", "")
+        for item in data.get("organic", [])[:5]:
+            link = item.get("link", "")
 
-                if link.endswith('.pdf') or link.endswith('.epub'):
-                    results.append({
-                        "source": "Serper",
-                        "title": item.get("title", ""),
-                        "author": "",
-                        "year": "",
-                        "pdf_url": link if link.endswith('.pdf') else "",
-                        "epub_url": link if link.endswith('.epub') else "",
-                        "weight": 1
-                    })
+            if link.endswith('.pdf') or link.endswith('.epub'):
+                results.append({
+                    "source": "Serper",
+                    "title": item.get("title", ""),
+                    "author": "",
+                    "year": "",
+                    "pdf_url": link if link.endswith('.pdf') else "",
+                    "epub_url": link if link.endswith('.epub') else "",
+                    "weight": 1
+                })
 
     except Exception as e:
         logger.error(f"Serper API error: {e}")
