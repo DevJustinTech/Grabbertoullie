@@ -19,3 +19,6 @@
 ## 2024-05-27 - httpx.AsyncClient Event Loop Lifecycle
 **Learning:** Initializing an `httpx.AsyncClient` directly at the module level in async frameworks can cause it to bind to the event loop active at import time. This creates `RuntimeError: Event loop is closed` or attachment issues during tests, where each test typically spins up its own loop.
 **Action:** Lazily instantiate shared async clients using a getter function (e.g., `get_shared_client()`) that checks if the client is `None` or `.is_closed` before returning it, ensuring it binds to the correct, currently active event loop.
+## 2024-05-27 - React Component Re-renders
+**Learning:** Found an issue where the main page (`Home`) re-rendered on every keystroke because of the `input` state updates. The child messages in the list were not memoized, causing the entire message history to be re-rendered on every keystroke.
+**Action:** Extract list items into a separate component and wrap them with `React.memo()`. When passing callback functions to child components that are memoized, use `useCallback` to maintain stable references so `React.memo()` doesn't get broken by a new callback reference on every render.
