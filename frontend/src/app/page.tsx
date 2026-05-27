@@ -286,12 +286,14 @@ export default function Home() {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type your request here..."
             aria-label="Search for a book"
+            autoFocus={true}
             className="w-full bg-white border border-zinc-200 shadow-sm rounded-full pl-6 pr-14 py-4 focus:outline-none focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100 transition-all text-zinc-800 placeholder:text-zinc-400 text-[15px]"
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
             aria-label={loading ? "Sending request" : "Send request"}
+            title={loading ? "Sending request" : input.trim() ? "Send request" : "Enter a request to send"}
             className="absolute right-2 top-2 bottom-2 bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full w-10 flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
           >
             {loading ? (
