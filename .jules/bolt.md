@@ -16,3 +16,6 @@
 ## 2024-05-04 - Unblocking Asyncio DNS Resolution
 **Learning:** `socket.getaddrinfo` is a synchronous system call in Python that blocks the entire asyncio event loop during execution, potentially stalling concurrent incoming requests in ASGI frameworks like FastAPI if DNS resolution is slow.
 **Action:** When performing DNS validation in asynchronous endpoints, use `await asyncio.get_running_loop().getaddrinfo(...)` to offload the blocking call to the loop's default thread pool.
+## 2024-05-27 - httpx.AsyncClient Event Loop Lifecycle
+**Learning:** Initializing an `httpx.AsyncClient` directly at the module level in async frameworks can cause it to bind to the event loop active at import time. This creates `RuntimeError: Event loop is closed` or attachment issues during tests, where each test typically spins up its own loop.
+**Action:** Lazily instantiate shared async clients using a getter function (e.g., `get_shared_client()`) that checks if the client is `None` or `.is_closed` before returning it, ensuring it binds to the correct, currently active event loop.
