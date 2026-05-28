@@ -95,7 +95,7 @@ async def search_web(query: str) -> dict:  # type: ignore[return]
         'X-API-KEY': SERPER_API_KEY,
         'Content-Type': 'application/json'
     }
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=60.0, event_hooks={"request": [check_url_hook]}) as client:
         try:
             response = await client.post(url, headers=headers, content=payload)
             response.raise_for_status()
@@ -164,7 +164,7 @@ Return JSON ONLY, with a single key "search_query" containing your exact advance
         "response_format": {"type": "json_object"}
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=60.0, event_hooks={"request": [check_url_hook]}) as client:
         try:
             resp1 = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload1)
             resp1.raise_for_status()
@@ -217,7 +217,7 @@ Or if TRULY not found after exhaustive check:
         "response_format": {"type": "json_object"}
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=60.0, event_hooks={"request": [check_url_hook]}) as client:
         try:
             resp2 = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload2)
             resp2.raise_for_status()
@@ -371,46 +371,6 @@ async def chat_endpoint(request: ChatRequest):
         }
     )
 
-async def is_valid_url(url: str) -> Tuple[bool, str]:
-    try:
-        parsed = urlparse(url)
-        if parsed.scheme not in ["http", "https"]:
-            return False, "Invalid URL scheme. Only HTTP and HTTPS are allowed."
-
-        hostname = parsed.hostname
-        if not hostname:
-            return False, "Invalid URL format."
-
-        # Optional: Resolve hostname to IP and check if it's public.
-        # This prevents accessing localhost or internal networks.
-        # Use asyncio.get_running_loop().getaddrinfo to prevent blocking the event loop
-        # during DNS resolution.
-        try:
-            # Prevent SSRF: Resolve to IP and block private/loopback/restricted IPs.
-            # Use getaddrinfo to support both IPv4 and IPv6 to prevent IPv6 bypasses.
-            # ⚡ Bolt: Use loop.getaddrinfo() to prevent the synchronous socket.getaddrinfo()
-            # from blocking the asyncio event loop during slow DNS resolutions.
-            loop = asyncio.get_running_loop()
-            addr_info = await loop.getaddrinfo(hostname, None)
-            for res in addr_info:
-                ip = res[4][0]
-                ip_obj = ipaddress.ip_address(ip)
-                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_multicast or ip_obj.is_reserved or ip_obj.is_link_local or ip_obj.is_unspecified or not ip_obj.is_global:
-                    return False, "Invalid or restricted URL domain/IP."
-        except socket.gaierror:
-            pass  # DNS resolution failed, might still be valid or handled by httpx later
-
-        return True, ""
-    except Exception as e:
-        return False, "An error occurred while validating the URL."
-
-async def check_url_hook(request: httpx.Request):
-    # Prevent SSRF by validating redirects using the same is_valid_url logic
-    valid, reason = await is_valid_url(str(request.url))
-    if not valid:
-        # Instead of ValueError, we can raise an HTTPException so it is handled correctly by FastAPI
-        raise HTTPException(status_code=400, detail=f"SSRF Attempt blocked: {reason}")
-
 @app.get("/api/download")
 async def download_endpoint(url: str):
     valid, reason = await is_valid_url(url)
@@ -520,7 +480,7 @@ async def process_whatsapp_message(phone_number: str, text: str):
             # Check file size if possible, or attempt to download and send
             # For simplicity, we'll try to get the headers first to check size
             try:
-                async with httpx.AsyncClient(timeout=60.0) as client:
+                async with httpx.AsyncClient(timeout=60.0, event_hooks={"request": [check_url_hook]}) as client:
                     head_resp = await client.head(file_url, follow_redirects=True)
                     content_length = int(head_resp.headers.get("content-length", 0))
 
@@ -557,7 +517,7 @@ async def send_whatsapp_text(to: str, text: str):
         "type": "text",
         "text": {"body": text}
     }
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=60.0, event_hooks={"request": [check_url_hook]}) as client:
         await client.post(url, headers=headers, json=payload)
 
 async def send_whatsapp_document(to: str, document_url: str, filename: str):
@@ -575,7 +535,7 @@ async def send_whatsapp_document(to: str, document_url: str, filename: str):
             "filename": filename
         }
     }
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=60.0, event_hooks={"request": [check_url_hook]}) as client:
         await client.post(url, headers=headers, json=payload)
 
 if __name__ == "__main__":
