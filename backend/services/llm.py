@@ -6,6 +6,8 @@ import logging
 import httpx
 from typing import Dict, Any
 
+from services.security import check_url_hook
+
 logger = logging.getLogger(__name__)
 
 _shared_client: httpx.AsyncClient | None = None
@@ -13,7 +15,7 @@ _shared_client: httpx.AsyncClient | None = None
 def get_shared_client() -> httpx.AsyncClient:
     global _shared_client
     if _shared_client is None or _shared_client.is_closed:
-        _shared_client = httpx.AsyncClient(timeout=60.0)
+        _shared_client = httpx.AsyncClient(timeout=60.0, event_hooks={"request": [check_url_hook]})
     return _shared_client
 
 JSON_BLOCK_RE = re.compile(r'```(?:json)?\s*(.*?)\s*```', re.DOTALL)
