@@ -25,6 +25,14 @@ import re
 backend_dir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(backend_dir, ".env"))
 
+_shared_client: httpx.AsyncClient | None = None
+
+def get_shared_client() -> httpx.AsyncClient:
+    global _shared_client
+    if _shared_client is None or _shared_client.is_closed:
+        _shared_client = httpx.AsyncClient(timeout=60.0)
+    return _shared_client
+
 JSON_BLOCK_RE = re.compile(r'```(?:json)?\s*(.*?)\s*```', re.DOTALL)
 
 def extract_json_from_response(text: str) -> dict:
@@ -95,14 +103,14 @@ async def search_web(query: str) -> dict:  # type: ignore[return]
         'X-API-KEY': SERPER_API_KEY,
         'Content-Type': 'application/json'
     }
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        try:
-            response = await client.post(url, headers=headers, content=payload)
-            response.raise_for_status()
-            return response.json()
-        except Exception as e:
-            logger.error(f"Serper API error: {e}")
-            return {}
+    client = get_shared_client()
+    try:
+        response = await client.post(url, headers=headers, content=payload)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.error(f"Serper API error: {e}")
+        return {}
 
 async def get_agent_response(user_message: str) -> dict:  # type: ignore[return]
     # Fallback response for missing API keys
@@ -164,22 +172,22 @@ Return JSON ONLY, with a single key "search_query" containing your exact advance
         "response_format": {"type": "json_object"}
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        try:
-            resp1 = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload1)
-            resp1.raise_for_status()
-            res1_json = resp1.json()
+    client = get_shared_client()
+    try:
+        resp1 = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload1)
+        resp1.raise_for_status()
+        res1_json = resp1.json()
 
-            content1 = res1_json['choices'][0]['message'].get('content')
-            if not content1:
-                 # Fallback for models that might put json in a different key or return empty string
-                 content1 = "{}"
-            query_data = extract_json_from_response(content1)
-            search_query = query_data.get("search_query", user_message)
-        except Exception as e:
-            content1_preview = locals().get('content1', 'No content')
-            logger.error(f"Failed to get query from AI: {e}. Raw content: {content1_preview}")
-            search_query = user_message
+        content1 = res1_json['choices'][0]['message'].get('content')
+        if not content1:
+             # Fallback for models that might put json in a different key or return empty string
+             content1 = "{}"
+        query_data = extract_json_from_response(content1)
+        search_query = query_data.get("search_query", user_message)
+    except Exception as e:
+        content1_preview = locals().get('content1', 'No content')
+        logger.error(f"Failed to get query from AI: {e}. Raw content: {content1_preview}")
+        search_query = user_message
 
     # Step 2: Perform search
     search_results = await search_web(search_query)
@@ -217,26 +225,26 @@ Or if TRULY not found after exhaustive check:
         "response_format": {"type": "json_object"}
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        try:
-            resp2 = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload2)
-            resp2.raise_for_status()
-            res2_json = resp2.json()
+    client = get_shared_client()
+    try:
+        resp2 = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload2)
+        resp2.raise_for_status()
+        res2_json = resp2.json()
 
-            content2 = res2_json['choices'][0]['message'].get('content')
-            if not content2:
-                 content2 = "{}"
-            final_data = extract_json_from_response(content2)
-            if not final_data or "status" not in final_data:
-                return {"status": "fail", "reason": f"AI output was missing 'status' key. Data: {final_data}"}
-            return final_data
-        except httpx.HTTPStatusError as e:
-            logger.error(f"Groq HTTP Error: {e}")
-            return {"status": "fail", "reason": f"Groq API Error: {e.response.status_code} {e.response.text}"}
-        except Exception as e:
-            res_preview = locals().get('res2_json', 'No JSON parsed')
-            logger.error(f"Failed to parse final JSON from AI: {repr(e)}. Raw res2_json: {res_preview}")
-            return {"status": "fail", "reason": f"Internal Processing Error: {repr(e)}"}
+        content2 = res2_json['choices'][0]['message'].get('content')
+        if not content2:
+             content2 = "{}"
+        final_data = extract_json_from_response(content2)
+        if not final_data or "status" not in final_data:
+            return {"status": "fail", "reason": f"AI output was missing 'status' key. Data: {final_data}"}
+        return final_data
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Groq HTTP Error: {e}")
+        return {"status": "fail", "reason": f"Groq API Error: {e.response.status_code} {e.response.text}"}
+    except Exception as e:
+        res_preview = locals().get('res2_json', 'No JSON parsed')
+        logger.error(f"Failed to parse final JSON from AI: {repr(e)}. Raw res2_json: {res_preview}")
+        return {"status": "fail", "reason": f"Internal Processing Error: {repr(e)}"}
 
 async def chat_stream_generator(user_message: str):
     """Generates SSE events for the chat endpoint."""
@@ -520,17 +528,17 @@ async def process_whatsapp_message(phone_number: str, text: str):
             # Check file size if possible, or attempt to download and send
             # For simplicity, we'll try to get the headers first to check size
             try:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    head_resp = await client.head(file_url, follow_redirects=True)
-                    content_length = int(head_resp.headers.get("content-length", 0))
+                client = get_shared_client()
+                head_resp = await client.head(file_url, follow_redirects=True)
+                content_length = int(head_resp.headers.get("content-length", 0))
 
-                    # If less than ~45MB, try sending as document
-                    if 0 < content_length < 45 * 1024 * 1024:
-                        await send_whatsapp_document(phone_number, file_url, f"{book_name}.{extension}")
-                    else:
-                        # Too large or unknown size, send link
-                        msg = f"Found '{book_name}'!\n\nThe file might be too large to send directly on WhatsApp. You can download it here:\n{file_url}"
-                        await send_whatsapp_text(phone_number, msg)
+                # If less than ~45MB, try sending as document
+                if 0 < content_length < 45 * 1024 * 1024:
+                    await send_whatsapp_document(phone_number, file_url, f"{book_name}.{extension}")
+                else:
+                    # Too large or unknown size, send link
+                    msg = f"Found '{book_name}'!\n\nThe file might be too large to send directly on WhatsApp. You can download it here:\n{file_url}"
+                    await send_whatsapp_text(phone_number, msg)
             except Exception as e:
                 logger.warning(f"Could not HEAD file, sending link instead: {e}")
                 msg = f"Found '{book_name}'!\n\nDownload link:\n{file_url}"
@@ -557,8 +565,8 @@ async def send_whatsapp_text(to: str, text: str):
         "type": "text",
         "text": {"body": text}
     }
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        await client.post(url, headers=headers, json=payload)
+    client = get_shared_client()
+    await client.post(url, headers=headers, json=payload)
 
 async def send_whatsapp_document(to: str, document_url: str, filename: str):
     url = f"https://graph.facebook.com/v17.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
@@ -575,8 +583,8 @@ async def send_whatsapp_document(to: str, document_url: str, filename: str):
             "filename": filename
         }
     }
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        await client.post(url, headers=headers, json=payload)
+    client = get_shared_client()
+    await client.post(url, headers=headers, json=payload)
 
 if __name__ == "__main__":
     import uvicorn  # type: ignore
