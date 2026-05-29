@@ -7,6 +7,7 @@ import asyncio
 from typing import Dict, Any, List, Optional, Tuple
 from bs4 import BeautifulSoup # type: ignore
 from zlib_scraper import search_books, get_book_info
+from services.security import check_url_hook
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ _shared_client: Optional[httpx.AsyncClient] = None
 def get_shared_client() -> httpx.AsyncClient:
     global _shared_client
     if _shared_client is None or _shared_client.is_closed:
-        _shared_client = httpx.AsyncClient(timeout=15.0, follow_redirects=True)
+        _shared_client = httpx.AsyncClient(timeout=15.0, follow_redirects=True, event_hooks={"request": [check_url_hook]})
     return _shared_client
 
 async def search_open_library(title: str, author: str = "") -> List[Dict[str, Any]]:
