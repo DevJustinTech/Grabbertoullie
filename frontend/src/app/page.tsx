@@ -292,6 +292,7 @@ export default function Home() {
             type="submit"
             disabled={loading || !input.trim()}
             aria-label={loading ? "Sending request" : "Send request"}
+            title={loading ? "Sending request..." : !input.trim() ? "Type a message to send" : "Send request"}
             className="absolute right-2 top-2 bottom-2 bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full w-10 flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
           >
             {loading ? (

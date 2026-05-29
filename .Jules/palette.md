@@ -24,3 +24,7 @@
 **Learning:** When implementing chat inputs, using a manual `onKeyDown` listener to detect the "Enter" key for submission creates significant accessibility and usability issues. Specifically, it breaks Input Method Editor (IME) composition for languages like Japanese or Chinese, where users press "Enter" to confirm character selection, resulting in premature, incomplete message submissions. Additionally, manually managing focus states by toggling `disabled={loading}` on inputs forcibly removes keyboard focus and prevents standard typing behavior while waiting for a response.
 
 **Action:** Always wrap chat inputs and submit buttons in a semantic `<form>` element and rely on native `onSubmit` events instead of keyboard listeners. To prevent multiple submissions during loading states, keep the input enabled but add an early return (`if (loading) return;`) directly in the submit handler. This maintains accessibility, preserves keyboard focus, and correctly supports IME environments.
+
+## 2024-05-30 - Add dynamic tooltip to icon-only buttons
+**Learning:** Users can be confused when an icon-only submit button is disabled without explanation. Adding a dynamic `title` attribute provides a native tooltip that acts as both an accessibility enhancement and micro-copy clarifying the disabled state.
+**Action:** Ensure all icon-only buttons have a descriptive `title` attribute, particularly when they involve complex disabled states.
