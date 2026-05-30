@@ -28,3 +28,7 @@
 ## 2024-05-30 - Add dynamic tooltip to icon-only buttons
 **Learning:** Users can be confused when an icon-only submit button is disabled without explanation. Adding a dynamic `title` attribute provides a native tooltip that acts as both an accessibility enhancement and micro-copy clarifying the disabled state.
 **Action:** Ensure all icon-only buttons have a descriptive `title` attribute, particularly when they involve complex disabled states.
+
+## 2024-05-30 - Auto-focus Search Inputs on Page Load
+**Learning:** For a chat or search interface, requiring a click to begin typing immediately upon page load introduces unnecessary friction, breaking the core interaction flow.
+**Action:** Use `autoFocus={true}` on primary search or chat inputs (such as the main search field) to eliminate the need for an initial click and reduce interaction friction on page load, provided it doesn't interrupt screen reader focus management on complex pages.
