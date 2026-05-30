@@ -33,3 +33,8 @@
 **Vulnerability:** The application was configured with `allow_origins=["*"]` alongside `allow_credentials=True` in `CORSMiddleware`, which is inherently insecure and allows unauthorized domains to exploit cross-origin requests using user credentials.
 **Learning:** Using wildcard origins with credentials is treated as a severe security anti-pattern. Modern security tools (and the underlying Starlette implementation) often strictly block this misconfiguration at startup, but even if bypassed, it creates severe CSRF and data exposure risks.
 **Prevention:** Explicitly restrict CORS origins. For dynamic environments, parse an environment variable containing allowed origins (e.g., `os.getenv("ALLOWED_ORIGINS")`) and map them correctly.
+## 2024-05-30 - SSRF Vulnerability via socket.getaddrinfo
+
+**Vulnerability:** The `is_valid_url` logic in `security.py` used the synchronous `socket.getaddrinfo(hostname, None)` which blocks the event loop and failed to check if resolved IPs were unspecified (e.g., `0.0.0.0`) or non-global. Duplicate but patched logic lived in `main.py`.
+**Learning:** Having duplicated security logic leads to one implementation falling behind and causing vulnerabilities when imported. Additionally, `getaddrinfo("0")` can resolve to `0.0.0.0` which must be explicitly checked using `not ip_obj.is_unspecified` and `ip_obj.is_global` to prevent SSRF bypasses to local network services.
+**Prevention:** Ensure security functions like URL validators are centralized and imported correctly. Always explicitly verify that resolved IPs are both globally routable (`is_global`) and not unspecified (`not is_unspecified`).
