@@ -28,3 +28,8 @@
 ## 2024-05-30 - Add dynamic tooltip to icon-only buttons
 **Learning:** Users can be confused when an icon-only submit button is disabled without explanation. Adding a dynamic `title` attribute provides a native tooltip that acts as both an accessibility enhancement and micro-copy clarifying the disabled state.
 **Action:** Ensure all icon-only buttons have a descriptive `title` attribute, particularly when they involve complex disabled states.
+
+## 2025-05-31 - Auto-Focus Primary Inputs to Reduce Interaction Friction
+
+**Learning:** On search or chat-heavy pages, requiring users to manually click or tab to the primary input field before they can start typing introduces unnecessary interaction friction, especially on page load. A significant UX improvement is to automatically place the keyboard cursor in the primary input right away.
+**Action:** Use `autoFocus={true}` on the main search or chat input fields for a smoother, zero-friction initial user experience.
