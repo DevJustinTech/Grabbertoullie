@@ -1,0 +1,4 @@
+💡 What: Extracted the individual message rendering inside `messages.map` into a `MessageItem` component wrapped with `React.memo()`. Also wrapped its dependent event handlers (`sendMessage`, `handleSendMessage`, `handleDownload`) with `useCallback`.
+🎯 Why: In the Next.js frontend application, typing in the main input field updates the `input` state, which causes the entire `Home` component to re-render. Since `messages.map` was rendered directly inside `Home`, every keystroke caused the full list of messages to re-render, leading to input lag and blocking the main thread when the history is long.
+📊 Impact: Prevents O(N) DOM diffing overhead on every keystroke. Drastically reduces the amount of work React has to do during active typing, improving UI responsiveness.
+🔬 Measurement: Verify using React Developer Tools Profiler - notice that typing no longer highlights or processes updates for the message history nodes.
