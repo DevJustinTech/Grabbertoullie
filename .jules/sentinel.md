@@ -38,3 +38,8 @@
 **Vulnerability:** Attackers could bypass SSRF protections because global `httpx.AsyncClient` instances lacked `event_hooks={"request": [check_url_hook]}`, preventing redirects from being validated. Additionally, URL validation failed to properly block unroutable IPs like `0.0.0.0` and did not fail closed on `socket.gaierror`.
 **Learning:** URL validation must occur strictly via HTTP client hooks so redirects are inherently secured. When validating IP addresses, using `ip_obj.is_private` is insufficient as `0.0.0.0` evaluates as `is_unspecified`. Lastly, `socket.gaierror` must return `False` rather than silently passing.
 **Prevention:** Apply `event_hooks={"request": [check_url_hook]}` globally on all HTTP clients, return `False` upon `socket.gaierror`, and strictly enforce `not ip_obj.is_global` or `ip_obj.is_unspecified`.
+
+## 2025-02-18 - Prevented Information Leakage in API Endpoints
+**Vulnerability:** Fast API error handlers in `get_agent_response` were leaking `e.response.text` and `repr(e)` directly to the client JSON payload.
+**Learning:** Verbose stringified exceptions returned via HTTP directly expose internal API trace paths and responses to the end user.
+**Prevention:** Replace explicit stack trace details with safe, generic user-facing messages in the JSON payload, while securely logging the raw exception trace directly to the server console.
