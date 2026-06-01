@@ -286,6 +286,7 @@ export default function Home() {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type your request here..."
             aria-label="Search for a book"
+            autoFocus
             className="w-full bg-white border border-zinc-200 shadow-sm rounded-full pl-6 pr-14 py-4 focus:outline-none focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100 transition-all text-zinc-800 placeholder:text-zinc-400 text-[15px]"
           />
           <button
