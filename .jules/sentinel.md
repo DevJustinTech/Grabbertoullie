@@ -33,3 +33,8 @@
 **Vulnerability:** The application was configured with `allow_origins=["*"]` alongside `allow_credentials=True` in `CORSMiddleware`, which is inherently insecure and allows unauthorized domains to exploit cross-origin requests using user credentials.
 **Learning:** Using wildcard origins with credentials is treated as a severe security anti-pattern. Modern security tools (and the underlying Starlette implementation) often strictly block this misconfiguration at startup, but even if bypassed, it creates severe CSRF and data exposure risks.
 **Prevention:** Explicitly restrict CORS origins. For dynamic environments, parse an environment variable containing allowed origins (e.g., `os.getenv("ALLOWED_ORIGINS")`) and map them correctly.
+
+## 2025-10-18 - [SSRF Bypass via Missing Event Hooks & Weak IP Checks]
+**Vulnerability:** Attackers could bypass SSRF protections because global `httpx.AsyncClient` instances lacked `event_hooks={"request": [check_url_hook]}`, preventing redirects from being validated. Additionally, URL validation failed to properly block unroutable IPs like `0.0.0.0` and did not fail closed on `socket.gaierror`.
+**Learning:** URL validation must occur strictly via HTTP client hooks so redirects are inherently secured. When validating IP addresses, using `ip_obj.is_private` is insufficient as `0.0.0.0` evaluates as `is_unspecified`. Lastly, `socket.gaierror` must return `False` rather than silently passing.
+**Prevention:** Apply `event_hooks={"request": [check_url_hook]}` globally on all HTTP clients, return `False` upon `socket.gaierror`, and strictly enforce `not ip_obj.is_global` or `ip_obj.is_unspecified`.
