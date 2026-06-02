@@ -22,3 +22,6 @@
 ## 2024-06-01 - Add Clear Button to Chat Input
 **Learning:** Implementing a conditional clear ('X') button on the search input significantly enhances usability, allowing users to discard long queries immediately instead of repeatedly tapping backspace. Ensuring the button maintains accessible ARIA labels, hover states, and restores focus to the input prevents disruptions to the keyboard navigation flow.
 **Action:** For all future primary search or chat inputs in the app, always consider providing a clear action button with setInput('') and ref.current?.focus() when the input is non-empty.
+## 2024-06-02 - Chat Message and Input Accessibility
+**Learning:** Screen readers announce visual messaging blocks identically if there is no hidden semantic distinction. Adding visually hidden `sr-only` text ("You said:"/"Bot said:") allows non-visual differentiation of chat sources without altering the UI. Also, using `aria-describedby` links visual shortcut hints explicitly to the input field so they are discovered on focus, which improves discoverability of shortcuts for screen reader users.
+**Action:** Always include semantic context text via `sr-only` elements when message roles are only implied by layout/color. Link secondary instruction or shortcut hint text directly to the interactive element it references using `aria-describedby`.
