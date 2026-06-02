@@ -239,12 +239,12 @@ Or if TRULY not found after exhaustive check:
             return {"status": "fail", "reason": f"AI output was missing 'status' key. Data: {final_data}"}
         return final_data
     except httpx.HTTPStatusError as e:
-        logger.error(f"Groq HTTP Error: {e}")
-        return {"status": "fail", "reason": f"Groq API Error: {e.response.status_code} {e.response.text}"}
+        logger.error(f"Groq HTTP Error: {e} - Response: {e.response.text}")
+        return {"status": "fail", "reason": "An error occurred while communicating with the search service."}
     except Exception as e:
         res_preview = locals().get('res2_json', 'No JSON parsed')
         logger.error(f"Failed to parse final JSON from AI: {repr(e)}. Raw res2_json: {res_preview}")
-        return {"status": "fail", "reason": f"Internal Processing Error: {repr(e)}"}
+        return {"status": "fail", "reason": "An internal error occurred while processing the search results."}
 
 async def chat_stream_generator(user_message: str):
     """Generates SSE events for the chat endpoint."""
