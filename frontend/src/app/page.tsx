@@ -51,6 +51,7 @@ const MessageItem = React.memo(({
             : "bg-white border border-zinc-200 text-zinc-800 rounded-3xl rounded-tl-sm shadow-sm"
           }`}
       >
+        <span className="sr-only">{msg.role === "user" ? "You said:" : "Bot said:"}</span>
         <p className="whitespace-pre-wrap">{msg.content}</p>
 
         {msg.result && msg.result.status === "disambiguation_required" && msg.result.candidates && (
@@ -325,6 +326,7 @@ export default function Home() {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type your request here..."
             aria-label="Search for a book"
+            aria-describedby="search-hint"
             autoFocus
             className="w-full bg-white border border-zinc-200 shadow-sm rounded-full pl-6 pr-24 py-4 focus:outline-none focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100 transition-all text-zinc-800 placeholder:text-zinc-400 text-[15px]"
           />
@@ -368,7 +370,7 @@ export default function Home() {
             </button>
           </div>
         </form>
-        <p className="text-center text-[11px] text-zinc-400 mt-3 font-medium flex items-center justify-center gap-1.5 flex-wrap">
+        <p id="search-hint" className="text-center text-[11px] text-zinc-400 mt-3 font-medium flex items-center justify-center gap-1.5 flex-wrap">
           Press <kbd className="px-1.5 py-0.5 text-[10px] font-sans bg-zinc-100 border border-zinc-200 text-zinc-500 rounded-md">Enter</kbd> to send.
           Press <kbd className="px-1.5 py-0.5 text-[10px] font-sans bg-zinc-100 border border-zinc-200 text-zinc-500 rounded-md">/</kbd> to search.
           For best results, specify the format (e.g. pdf).
