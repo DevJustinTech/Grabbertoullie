@@ -326,15 +326,35 @@ export default function Home() {
             placeholder="Type your request here..."
             aria-label="Search for a book"
             autoFocus
-            className="w-full bg-white border border-zinc-200 shadow-sm rounded-full pl-6 pr-14 py-4 focus:outline-none focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100 transition-all text-zinc-800 placeholder:text-zinc-400 text-[15px]"
+            className="w-full bg-white border border-zinc-200 shadow-sm rounded-full pl-6 pr-24 py-4 focus:outline-none focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100 transition-all text-zinc-800 placeholder:text-zinc-400 text-[15px]"
           />
-          <button
-            type="submit"
-            disabled={loading || !input.trim()}
-            aria-label={loading ? "Sending request" : "Send request"}
-            title={loading ? "Sending request..." : !input.trim() ? "Type a message to send" : "Send request"}
-            className="absolute right-2 top-2 bottom-2 bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full w-10 flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
-          >
+
+          <div className="absolute right-2 top-2 bottom-2 flex items-center gap-1">
+            {input.trim() && !loading && (
+              <button
+                type="button"
+                onClick={() => {
+                  setInput("");
+                  inputRef.current?.focus();
+                }}
+                aria-label="Clear input"
+                title="Clear input"
+                className="text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 p-2 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
+              >
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || !input.trim()}
+              aria-label={loading ? "Sending request" : "Send request"}
+              title={loading ? "Sending request..." : !input.trim() ? "Type a message to send" : "Send request"}
+              className="bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full w-10 h-10 flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
+            >
             {loading ? (
               <svg aria-hidden="true" className="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -345,7 +365,8 @@ export default function Home() {
                 <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
               </svg>
             )}
-          </button>
+            </button>
+          </div>
         </form>
         <p className="text-center text-[11px] text-zinc-400 mt-3 font-medium flex items-center justify-center gap-1.5 flex-wrap">
           Press <kbd className="px-1.5 py-0.5 text-[10px] font-sans bg-zinc-100 border border-zinc-200 text-zinc-500 rounded-md">Enter</kbd> to send.
