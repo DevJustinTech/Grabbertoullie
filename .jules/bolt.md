@@ -22,3 +22,6 @@
 ## 2024-05-27 - Parallel Scraping in Standard Ebooks
 **Learning:** In `search_standard_ebooks` (`backend/services/search.py`), the function was iteratively awaiting `client.get(book_url)` for the top 5 candidates. This sequential fetching caused a compounded latency of ~5x network round-trips.
 **Action:** Used `asyncio.gather` with a helper async function (`_fetch_se_info`) to execute those HTTP requests concurrently, reducing latency.
+## 2024-05-28 - SSRF Hook Defeating Connection Pooling
+**Learning:** During concurrent validation of URLs using `httpx.AsyncClient`, connection pooling is generally expected to speed up subsequent requests to the same domain by skipping DNS resolution and TCP handshakes. However, attaching a custom security `event_hook` (like `check_url_hook`) that executes DNS validation (`is_valid_url` -> `getaddrinfo`) BEFORE every request forces a new DNS lookup every time, effectively defeating the speed benefits of the underlying HTTP connection pool.
+**Action:** Implement a time-bound cache (e.g., `_dns_cache` dictionary with a TTL) inside the SSRF validation function to avoid repeating costly thread pool DNS resolutions for already-validated domains.
