@@ -22,3 +22,6 @@
 ## 2024-06-01 - Add Clear Button to Chat Input
 **Learning:** Implementing a conditional clear ('X') button on the search input significantly enhances usability, allowing users to discard long queries immediately instead of repeatedly tapping backspace. Ensuring the button maintains accessible ARIA labels, hover states, and restores focus to the input prevents disruptions to the keyboard navigation flow.
 **Action:** For all future primary search or chat inputs in the app, always consider providing a clear action button with setInput('') and ref.current?.focus() when the input is non-empty.
+## 2024-06-03 - Screen Reader Context in Chat Interfaces
+**Learning:** Using visually hidden `sr-only` text is critical for differentiating chat message sources (e.g., "You said" vs "Bot said") in Next.js applications, as screen readers cannot interpret visual alignment or color styling alone.
+**Action:** Always include explicitly labeled, visually hidden span elements inside generic chat bubbles when the visual design relies solely on alignment to indicate the message sender.

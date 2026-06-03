@@ -51,7 +51,10 @@ const MessageItem = React.memo(({
             : "bg-white border border-zinc-200 text-zinc-800 rounded-3xl rounded-tl-sm shadow-sm"
           }`}
       >
-        <p className="whitespace-pre-wrap">{msg.content}</p>
+        <p className="whitespace-pre-wrap">
+          <span className="sr-only">{msg.role === "user" ? "You said: " : "Bot said: "}</span>
+          {msg.content}
+        </p>
 
         {msg.result && msg.result.status === "disambiguation_required" && msg.result.candidates && (
           <div className="flex flex-col gap-2 mt-2">
