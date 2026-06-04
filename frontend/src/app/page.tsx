@@ -82,6 +82,7 @@ const MessageItem = React.memo(({
             </div>
             <button
               onClick={() => onDownload(msg.result!.file_url!, msg.result!.source)}
+              aria-label={`Download ${msg.result!.book_name || 'File'}`}
               className="w-full bg-zinc-900 hover:bg-zinc-800 text-white py-2.5 px-4 rounded-xl transition-all duration-200 text-sm font-medium flex items-center justify-center gap-2 group active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
             >
               <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 group-hover:-translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -290,7 +291,8 @@ export default function Home() {
           {loading && (
             <div className="flex justify-start animate-in fade-in duration-300">
               <div className="bg-white border border-zinc-200 px-5 py-4 rounded-3xl rounded-tl-sm shadow-sm text-zinc-500 flex flex-col gap-2">
-                <div className="flex gap-1.5 items-center">
+                <div className="flex gap-1.5 items-center" role="status">
+                  <span className="sr-only">Bot is typing...</span>
                   <div className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce"></div>
                   <div className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: "0.15s" }}></div>
                   <div className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: "0.3s" }}></div>
