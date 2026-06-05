@@ -25,3 +25,6 @@
 ## 2024-06-02 - Chat Message and Input Accessibility
 **Learning:** Screen readers announce visual messaging blocks identically if there is no hidden semantic distinction. Adding visually hidden `sr-only` text ("You said:"/"Bot said:") allows non-visual differentiation of chat sources without altering the UI. Also, using `aria-describedby` links visual shortcut hints explicitly to the input field so they are discovered on focus, which improves discoverability of shortcuts for screen reader users.
 **Action:** Always include semantic context text via `sr-only` elements when message roles are only implied by layout/color. Link secondary instruction or shortcut hint text directly to the interactive element it references using `aria-describedby`.
+## 2024-06-05 - Contextual ARIA labels for dynamic identical buttons
+**Learning:** In UI lists or chat streams where each result generates identical action buttons (e.g., 'Download File'), users with screen readers cannot distinguish between them.
+**Action:** Always inject contextual payload data into a dynamic `aria-label` (e.g., `aria-label={`Download ${msg.result?.book_name}`}`) to ensure accessibility and clarity for identical UI action elements.
