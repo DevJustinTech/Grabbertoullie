@@ -43,3 +43,7 @@
 **Vulnerability:** Fast API error handlers in `get_agent_response` were leaking `e.response.text` and `repr(e)` directly to the client JSON payload.
 **Learning:** Verbose stringified exceptions returned via HTTP directly expose internal API trace paths and responses to the end user.
 **Prevention:** Replace explicit stack trace details with safe, generic user-facing messages in the JSON payload, while securely logging the raw exception trace directly to the server console.
+## 2024-06-05 - Fix Header Injection in Download Proxy
+**Vulnerability:** The `/api/download` endpoint blindly copied all headers from the upstream HTTP response (e.g., `dict(response.headers)`) into the proxied response.
+**Learning:** This could allow a malicious upstream server to inject arbitrary HTTP headers (such as `Set-Cookie`, overly permissive CORS headers, or caching directives) to attack the frontend application.
+**Prevention:** When proxying HTTP responses, never blindly copy all upstream headers. Always use a strict allow-list (e.g., `content-type`, `content-length`), force safe defaults if critical headers are missing, and normalize header keys to lowercase to prevent duplicate header conflicts.

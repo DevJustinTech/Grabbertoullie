@@ -400,9 +400,17 @@ async def download_endpoint(url: str):
             response = await client.get(url)
             response.raise_for_status()
 
-            headers: dict[str, str] = dict(response.headers)
-            # Remove transfer-encoding as we're reading the whole content
-            headers.pop("transfer-encoding", None)
+            # Sentinel: Strict allow-list of safe headers to prevent Header Injection / XSS
+            safe_headers = {"content-type", "content-length", "accept-ranges"}
+            headers: dict[str, str] = {}
+            for k, v in response.headers.items():
+                k_lower = k.lower()
+                if k_lower in safe_headers:
+                    headers[k_lower] = v
+
+            # Force safe defaults if critical headers are missing
+            if "content-type" not in headers:
+                headers["content-type"] = "application/octet-stream"
 
             # Suggest a filename from the URL or Content-Disposition
             content_disposition = response.headers.get("content-disposition")
