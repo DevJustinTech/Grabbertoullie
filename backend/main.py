@@ -400,16 +400,20 @@ async def download_endpoint(url: str):
             response = await client.get(url)
             response.raise_for_status()
 
-            headers: dict[str, str] = dict(response.headers)
-            # Remove transfer-encoding as we're reading the whole content
-            headers.pop("transfer-encoding", None)
+            # Use a strict allow-list for upstream headers to prevent Header Injection (e.g., Set-Cookie, XSS)
+            safe_headers = {"content-type", "content-length"}
+            headers: dict[str, str] = {
+                k.lower(): v for k, v in response.headers.items() if k.lower() in safe_headers
+            }
+            if "content-type" not in headers:
+                headers["content-type"] = "application/octet-stream"
 
             # Suggest a filename from the URL or Content-Disposition
             content_disposition = response.headers.get("content-disposition")
             if content_disposition:
                 # Sanitize upstream header to prevent HTTP header injection
                 sanitized_disposition = re.sub(r'[\r\n]', '', content_disposition)
-                headers["Content-Disposition"] = sanitized_disposition
+                headers["content-disposition"] = sanitized_disposition
             else:
                 filename = url.split("/")[-1]
                 if not filename or "?" in filename:
@@ -417,7 +421,7 @@ async def download_endpoint(url: str):
 
                 # Sanitize filename to prevent HTTP header injection and escaping quotes
                 sanitized_filename = re.sub(r'[\r\n"]', '_', filename)
-                headers["Content-Disposition"] = f'attachment; filename="{sanitized_filename}"'
+                headers["content-disposition"] = f'attachment; filename="{sanitized_filename}"'
 
             return Response(content=response.content, status_code=response.status_code, headers=headers)
     except HTTPException:
