@@ -30,3 +30,8 @@
 **Learning:** In UI lists or chat streams where each result generates identical action buttons (e.g., 'Download File'), relying solely on the visible button text creates an accessibility failure. A screen reader user navigating by interactive elements will just hear "Download File" repeated with no context of *which* file they are downloading.
 
 **Action:** Whenever implementing lists or repeating elements with identical action buttons, always inject contextual payload data into a dynamic `aria-label` (e.g., `aria-label={`Download ${bookName}`}`) to ensure screen reader users can distinguish between them.
+## 2025-03-05 - Chat Interfaces Require role="log"
+
+**Learning:** When building live chat interfaces in React, simply rendering a stream of messages visually is not enough. Screen reader users will not be notified of incoming messages unless the container has specific ARIA attributes. Also, using non-semantic `div` or `button` elements for lists of actionable items (like disambiguation results) makes it harder for screen reader users to navigate and understand the grouping of choices. Furthermore, long unwrappable text strings in user inputs or system responses can break chat UI layouts without explicit CSS word-breaking instructions.
+
+**Action:** Whenever building a chat interface or dynamic message list, always wrap the messages container in a `role="log"` and `aria-live="polite"` element. Convert groups of related action buttons into semantic `<ul>`/`<li>` structures. Ensure user-generated content wrappers use utility classes like `break-words` to prevent UI overflow.
