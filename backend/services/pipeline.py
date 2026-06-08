@@ -64,6 +64,13 @@ async def validate_url(url: str) -> bool:
     if not url:
         return False
 
+    # 🛡️ Sentinel: Enforce strict SSRF protection before ANY requests are made, including Playwright
+    from services.security import is_valid_url
+    valid, _ = await is_valid_url(url)
+    if not valid:
+        logger.warning(f"SSRF validation blocked url in pipeline: {url}")
+        return False
+
     # Check if this is a Z-Library domain
     if any(domain in url for domain in ["z-lib", "z-library", "1lib"]):
         return await _validate_zlib_url(url)

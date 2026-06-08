@@ -47,3 +47,7 @@
 **Vulnerability:** The backend download proxy blindly copied all upstream HTTP response headers, leading to a potential Header Injection vulnerability (including `Set-Cookie` and XSS vectors).
 **Learning:** Automatically forwarding upstream headers in a proxy can inadvertently leak or inject headers that bypass security mechanisms on the proxy's domain.
 **Prevention:** Always employ a strict allow-list of known safe headers (e.g., `content-type`, `content-length`), ensure safe fallback defaults, and normalize header keys to lowercase when merging.
+## 2025-06-25 - [Blind SSRF Bypass via Headless Browser (Playwright)]
+**Vulnerability:** The application's `validate_url` function relied on `is_valid_url` hooks inside `httpx.AsyncClient` for SSRF protection, but selectively launched an unhooked Playwright headless browser for specific domains (e.g., URLs containing `z-lib`). Attackers could exploit this by embedding the trigger string into unroutable/local URLs (e.g., `file:///etc/passwd#z-lib` or `http://169.254.169.254/?z-lib`), performing Blind SSRF and file reads.
+**Learning:** Security hooks applied to one HTTP client (like `httpx`) do not carry over to headless browsers or other outbound request mechanisms. Conditional validation logic must sit at the absolute highest entry point to protect all underlying subsystems.
+**Prevention:** Always validate user-supplied URLs *before* routing them to any internal request method (whether HTTP clients or headless browsers) to ensure complete SSRF coverage.
