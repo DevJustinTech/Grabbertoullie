@@ -82,6 +82,7 @@ const MessageItem = React.memo(({
             </div>
             <button
               onClick={() => onDownload(msg.result!.file_url!, msg.result!.source)}
+              aria-label={`Download ${msg.result?.book_name || 'file'}`}
               className="w-full bg-zinc-900 hover:bg-zinc-800 text-white py-2.5 px-4 rounded-xl transition-all duration-200 text-sm font-medium flex items-center justify-center gap-2 group active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
             >
               <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 group-hover:-translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
