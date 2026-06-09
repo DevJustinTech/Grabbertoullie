@@ -46,32 +46,33 @@ const MessageItem = React.memo(({
         } animate-in fade-in slide-in-from-bottom-2 duration-300`}
     >
       <div
-        className={`max-w-[85%] sm:max-w-[75%] px-5 py-3.5 text-[15px] leading-relaxed flex flex-col gap-3 ${msg.role === "user"
+        className={`max-w-[85%] sm:max-w-[75%] px-5 py-3.5 text-[15px] leading-relaxed flex flex-col gap-3 break-words ${msg.role === "user"
             ? "bg-zinc-900 text-white rounded-3xl rounded-tr-sm"
             : "bg-white border border-zinc-200 text-zinc-800 rounded-3xl rounded-tl-sm shadow-sm"
           }`}
       >
         <span className="sr-only">{msg.role === "user" ? "You said:" : "Bot said:"}</span>
-        <p className="whitespace-pre-wrap">{msg.content}</p>
+        <p className="whitespace-pre-wrap break-words">{msg.content}</p>
 
         {msg.result && msg.result.status === "disambiguation_required" && msg.result.candidates && (
-          <div className="flex flex-col gap-2 mt-2">
+          <ul className="flex flex-col gap-2 mt-2">
             {msg.result.candidates.map((candidate, i) => (
-              <button
-                key={i}
-                onClick={() => {
-                  const formatSuffix = msg.result?.format && msg.result.format !== "any" ? ` ${msg.result.format}` : "";
-                  onSendMessage(`grab ${candidate.raw_title} by ${candidate.raw_author}${formatSuffix} [exact]`);
-                }}
-                className="text-left bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-800 py-2.5 px-4 rounded-xl transition-all duration-200 text-sm font-medium active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
-              >
-                {candidate.title}
-                {candidate.source && (
-                  <span className="block text-xs font-normal text-zinc-500 mt-0.5">Source: {candidate.source}</span>
-                )}
-              </button>
+              <li key={i}>
+                <button
+                  onClick={() => {
+                    const formatSuffix = msg.result?.format && msg.result.format !== "any" ? ` ${msg.result.format}` : "";
+                    onSendMessage(`grab ${candidate.raw_title} by ${candidate.raw_author}${formatSuffix} [exact]`);
+                  }}
+                  className="w-full text-left bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-800 py-2.5 px-4 rounded-xl transition-all duration-200 text-sm font-medium active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
+                >
+                  {candidate.title}
+                  {candidate.source && (
+                    <span className="block text-xs font-normal text-zinc-500 mt-0.5">Source: {candidate.source}</span>
+                  )}
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
 
         {msg.result && msg.result.status === "success" && msg.result.file_url && (
