@@ -30,3 +30,8 @@
 **Learning:** In UI lists or chat streams where each result generates identical action buttons (e.g., 'Download File'), relying solely on the visible button text creates an accessibility failure. A screen reader user navigating by interactive elements will just hear "Download File" repeated with no context of *which* file they are downloading.
 
 **Action:** Whenever implementing lists or repeating elements with identical action buttons, always inject contextual payload data into a dynamic `aria-label` (e.g., `aria-label={`Download ${bookName}`}`) to ensure screen reader users can distinguish between them.
+## 2024-06-10 - Semantic Lists for Actionable Results & Live Chat Accessibility
+
+**Learning:** Relying on basic `div` containers for lists of actionable items (like disambiguation candidates) reduces navigability for screen reader users, who depend on semantic list structures (`<ul>`/`<li>`) to understand group counts and jump between related items. Furthermore, wrapping a chat container dynamically filling with messages without specifying `role="log"` and `aria-live="polite"` completely hides incoming text from assistive technology. Finally, long un-wrappable strings (e.g. URLs or file names) within chat message paragraphs can easily break layout structures if standard whitespace rules are used.
+
+**Action:** Whenever rendering dynamic lists of options or candidates, structure them explicitly as unordered or ordered lists (`<ul>`/`<ol>`) with constituent `<li>` tags. Always apply `role="log"` and `aria-live="polite"` to parent chat/message containers to ensure new messages are announced. Always pair text containers with `break-words` when dealing with potentially long contiguous text blobs.
