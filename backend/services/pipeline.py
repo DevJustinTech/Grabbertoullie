@@ -11,7 +11,7 @@ from playwright.async_api import async_playwright
 from .search import (
     search_zlibrary
 )
-from services.security import check_url_hook
+from services.security import check_url_hook, is_valid_url
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,11 @@ async def validate_url(url: str) -> bool:
     For other URLs, uses HEAD, falls back to GET stream if HEAD returns 405.
     """
     if not url:
+        return False
+
+    # Prevent SSRF: validate URL before using Playwright or httpx
+    valid, _ = await is_valid_url(url)
+    if not valid:
         return False
 
     # Check if this is a Z-Library domain

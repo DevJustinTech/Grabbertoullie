@@ -201,6 +201,11 @@ async def get_book_info(book_url: str) -> dict:  # pyre-ignore
     Fetch a book's detail page and return a BookDetail dict.
     Automatically grabs the download URL.
     """
+    from services.security import is_valid_url
+    valid, _ = await is_valid_url(book_url)
+    if not valid:
+        raise ConnectionError(f"Invalid URL for scraping: {book_url}")
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(
