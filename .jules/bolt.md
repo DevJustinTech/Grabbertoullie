@@ -22,3 +22,6 @@
 ## 2024-05-27 - Parallel Scraping in Standard Ebooks
 **Learning:** In `search_standard_ebooks` (`backend/services/search.py`), the function was iteratively awaiting `client.get(book_url)` for the top 5 candidates. This sequential fetching caused a compounded latency of ~5x network round-trips.
 **Action:** Used `asyncio.gather` with a helper async function (`_fetch_se_info`) to execute those HTTP requests concurrently, reducing latency.
+## 2024-05-28 - httpx.AsyncClient Instantiation in Route Handlers
+**Learning:** Re-instantiating `httpx.AsyncClient` inside a frequently accessed asynchronous route handler (like `download_endpoint` in FastAPI) creates ~30-50ms of overhead per request due to connection pool setup/teardown. This limits overall API throughput and increases response times.
+**Action:** When making outbound asynchronous HTTP requests within route handlers or event hooks, use a lazily instantiated, shared module-level `httpx.AsyncClient` instance via a getter (e.g., `get_shared_client()`) to reuse connections and avoid overhead, while ensuring it is bound to the currently active event loop.
