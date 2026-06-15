@@ -22,3 +22,6 @@
 ## 2024-05-27 - Parallel Scraping in Standard Ebooks
 **Learning:** In `search_standard_ebooks` (`backend/services/search.py`), the function was iteratively awaiting `client.get(book_url)` for the top 5 candidates. This sequential fetching caused a compounded latency of ~5x network round-trips.
 **Action:** Used `asyncio.gather` with a helper async function (`_fetch_se_info`) to execute those HTTP requests concurrently, reducing latency.
+## 2025-02-27 - httpx.AsyncClient Instantiation Overhead in Downloads
+**Learning:** In `download_endpoint` (`backend/main.py`), a new `httpx.AsyncClient` was instantiated using `async with httpx.AsyncClient(...)` for every file download request. This caused a significant overhead (~1.7s per 50 requests in benchmarks) by unnecessarily spinning up and tearing down the client machinery and its internal connection pools.
+**Action:** Replaced dynamic client instantiation with the module-level shared client accessed via `get_shared_client()`, maintaining specific behaviors like redirect following by passing `follow_redirects=True` directly to the `client.get()` method call.
