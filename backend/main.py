@@ -34,6 +34,8 @@ def get_shared_client() -> httpx.AsyncClient:
     return _shared_client
 
 JSON_BLOCK_RE = re.compile(r'```(?:json)?\s*(.*?)\s*```', re.DOTALL)
+HEADER_INJECTION_RE = re.compile(r'[\r\n]')
+FILENAME_INJECTION_RE = re.compile(r'[\r\n"]')
 
 def extract_json_from_response(text: str) -> dict:
     if text is None:
@@ -396,34 +398,34 @@ async def download_endpoint(url: str):
         raise HTTPException(status_code=400, detail=reason)
 
     try:
-        async with httpx.AsyncClient(follow_redirects=True, event_hooks={"request": [check_url_hook]}) as client:
-            response = await client.get(url)
-            response.raise_for_status()
+        client = get_shared_client()
+        response = await client.get(url, follow_redirects=True)
+        response.raise_for_status()
 
-            # Use a strict allow-list for upstream headers to prevent Header Injection (e.g., Set-Cookie, XSS)
-            safe_headers = {"content-type", "content-length"}
-            headers: dict[str, str] = {
-                k.lower(): v for k, v in response.headers.items() if k.lower() in safe_headers
-            }
-            if "content-type" not in headers:
-                headers["content-type"] = "application/octet-stream"
+        # Use a strict allow-list for upstream headers to prevent Header Injection (e.g., Set-Cookie, XSS)
+        safe_headers = {"content-type", "content-length"}
+        headers: dict[str, str] = {
+            k.lower(): v for k, v in response.headers.items() if k.lower() in safe_headers
+        }
+        if "content-type" not in headers:
+            headers["content-type"] = "application/octet-stream"
 
-            # Suggest a filename from the URL or Content-Disposition
-            content_disposition = response.headers.get("content-disposition")
-            if content_disposition:
-                # Sanitize upstream header to prevent HTTP header injection
-                sanitized_disposition = re.sub(r'[\r\n]', '', content_disposition)
-                headers["content-disposition"] = sanitized_disposition
-            else:
-                filename = url.split("/")[-1]
-                if not filename or "?" in filename:
-                    filename = "downloaded_file"
+        # Suggest a filename from the URL or Content-Disposition
+        content_disposition = response.headers.get("content-disposition")
+        if content_disposition:
+            # Sanitize upstream header to prevent HTTP header injection
+            sanitized_disposition = HEADER_INJECTION_RE.sub('', content_disposition)
+            headers["content-disposition"] = sanitized_disposition
+        else:
+            filename = url.split("/")[-1]
+            if not filename or "?" in filename:
+                filename = "downloaded_file"
 
-                # Sanitize filename to prevent HTTP header injection and escaping quotes
-                sanitized_filename = re.sub(r'[\r\n"]', '_', filename)
-                headers["content-disposition"] = f'attachment; filename="{sanitized_filename}"'
+            # Sanitize filename to prevent HTTP header injection and escaping quotes
+            sanitized_filename = FILENAME_INJECTION_RE.sub('_', filename)
+            headers["content-disposition"] = f'attachment; filename="{sanitized_filename}"'
 
-            return Response(content=response.content, status_code=response.status_code, headers=headers)
+        return Response(content=response.content, status_code=response.status_code, headers=headers)
     except HTTPException:
         raise
     except Exception as e:
