@@ -47,3 +47,8 @@
 **Vulnerability:** The backend download proxy blindly copied all upstream HTTP response headers, leading to a potential Header Injection vulnerability (including `Set-Cookie` and XSS vectors).
 **Learning:** Automatically forwarding upstream headers in a proxy can inadvertently leak or inject headers that bypass security mechanisms on the proxy's domain.
 **Prevention:** Always employ a strict allow-list of known safe headers (e.g., `content-type`, `content-length`), ensure safe fallback defaults, and normalize header keys to lowercase when merging.
+
+## 2024-05-28 - Missing Webhook Secret Checks Allow Authentication Bypass
+**Vulnerability:** The application failed to explicitly check if `WHATSAPP_VERIFY_TOKEN` and `WHATSAPP_APP_SECRET` were configured before using them in the `/webhook` endpoints. This allowed an attacker to bypass authentication or cause unexpected failures by interacting with the webhook if the environment variables were unset or empty. Also, direct string comparison (`==`) was used for token validation instead of a timing-safe method.
+**Learning:** Security mechanisms that rely on secrets must explicitly fail closed if those secrets are unconfigured. Additionally, comparing sensitive tokens with `==` opens the door to timing attacks.
+**Prevention:** Always verify that cryptographic secrets are configured before use, throwing a 500 Internal Server Error if they are missing. Use `hmac.compare_digest` for validating tokens.
