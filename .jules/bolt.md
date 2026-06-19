@@ -22,3 +22,6 @@
 ## 2024-05-27 - Parallel Scraping in Standard Ebooks
 **Learning:** In `search_standard_ebooks` (`backend/services/search.py`), the function was iteratively awaiting `client.get(book_url)` for the top 5 candidates. This sequential fetching caused a compounded latency of ~5x network round-trips.
 **Action:** Used `asyncio.gather` with a helper async function (`_fetch_se_info`) to execute those HTTP requests concurrently, reducing latency.
+## 2026-06-19 - httpx.AsyncClient Event Hooks and Redirects
+**Learning:** When using a shared `httpx.AsyncClient` that relies on event hooks (like `check_url_hook` for SSRF protection), the hooks are preserved even when overriding request-level parameters like `follow_redirects=True` on individual `.get()` calls. This maintains security while allowing connection pooling for high-throughput endpoints. The reviewer incorrectly hallucinated that the event hook was lost.
+**Action:** Always verify the actual configuration of a shared client via unit testing to confidently ignore hallucinated code review feedback.
