@@ -47,3 +47,8 @@
 **Vulnerability:** The backend download proxy blindly copied all upstream HTTP response headers, leading to a potential Header Injection vulnerability (including `Set-Cookie` and XSS vectors).
 **Learning:** Automatically forwarding upstream headers in a proxy can inadvertently leak or inject headers that bypass security mechanisms on the proxy's domain.
 **Prevention:** Always employ a strict allow-list of known safe headers (e.g., `content-type`, `content-length`), ensure safe fallback defaults, and normalize header keys to lowercase when merging.
+
+## 2024-06-20 - [Webhook Signature Bypass (Fail-Open)]
+**Vulnerability:** The WhatsApp webhook endpoint failed open when the application secret (`WHATSAPP_APP_SECRET`) was unconfigured. It silently bypassed signature validation and processed unauthorized payloads.
+**Learning:** Missing configuration for security-critical parameters (like HMAC secrets) should never default to a bypass. If a required secret is absent, the application must immediately fail securely (e.g., return HTTP 500) rather than processing the request.
+**Prevention:** Always enforce the presence of required secrets before performing signature checks. If `if SECRET:` logic exists, ensure the `else` branch explicitly rejects the request.
