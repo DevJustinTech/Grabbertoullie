@@ -47,3 +47,7 @@
 **Vulnerability:** The backend download proxy blindly copied all upstream HTTP response headers, leading to a potential Header Injection vulnerability (including `Set-Cookie` and XSS vectors).
 **Learning:** Automatically forwarding upstream headers in a proxy can inadvertently leak or inject headers that bypass security mechanisms on the proxy's domain.
 **Prevention:** Always employ a strict allow-list of known safe headers (e.g., `content-type`, `content-length`), ensure safe fallback defaults, and normalize header keys to lowercase when merging.
+## 2025-06-21 - [Prevented URL Parameter Injection in External APIs]
+**Vulnerability:** External search API URLs (like Open Library, Project Gutenberg, and Semantic Scholar) were built using direct string concatenation with simple `.replace(' ', '+')` or `.replace(' ', '%20')`. This allowed for URL parameter injection via malicious search queries (e.g., `title="Book&limit=1000"`).
+**Learning:** Manual string replacement for spaces is insufficient for safely building HTTP requests to third-party endpoints. It exposes the backend to injection attacks that manipulate external API parameters and can lead to unexpected behaviors or rate limit exhaustion.
+**Prevention:** Always use standard library functions like `urllib.parse.quote_plus` or `urllib.parse.quote` to properly escape all special characters when injecting user input into external URL endpoints.
