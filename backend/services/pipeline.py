@@ -9,7 +9,11 @@ from rapidfuzz import fuzz
 from playwright.async_api import async_playwright
 # pyre-ignore[21]
 from .search import (
-    search_zlibrary
+    search_zlibrary,
+    search_open_library,
+    search_standard_ebooks,
+    search_project_gutenberg,
+    search_semantic_scholar
 )
 from services.security import check_url_hook
 
@@ -83,6 +87,10 @@ async def perform_parallel_search(metadata: Dict[str, Any]) -> List[Dict[str, An
 
     results = await asyncio.gather(
         search_zlibrary(title, author, metadata.get("format", "any")),
+        search_open_library(title, author),
+        search_standard_ebooks(title),
+        search_project_gutenberg(title, author),
+        search_semantic_scholar(title, author),
         return_exceptions=True
     )
 
