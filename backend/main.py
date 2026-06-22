@@ -396,8 +396,15 @@ async def download_endpoint(url: str):
         raise HTTPException(status_code=400, detail=reason)
 
     try:
-        async with httpx.AsyncClient(follow_redirects=True, event_hooks={"request": [check_url_hook]}) as client:
-            response = await client.get(url)
+        # We must use a local client to ensure event_hooks are applied per the security reviewer,
+        # but we can stream the response to save memory.
+        # Note: We return the StreamingResponse without closing the client block immediately,
+        # so we must manage the client lifecycle.
+        client = httpx.AsyncClient(follow_redirects=True, event_hooks={"request": [check_url_hook]})
+
+        try:
+            request = client.build_request("GET", url)
+            response = await client.send(request, stream=True)
             response.raise_for_status()
 
             # Use a strict allow-list for upstream headers to prevent Header Injection (e.g., Set-Cookie, XSS)
@@ -418,12 +425,25 @@ async def download_endpoint(url: str):
                 filename = url.split("/")[-1]
                 if not filename or "?" in filename:
                     filename = "downloaded_file"
-
                 # Sanitize filename to prevent HTTP header injection and escaping quotes
                 sanitized_filename = re.sub(r'[\r\n"]', '_', filename)
                 headers["content-disposition"] = f'attachment; filename="{sanitized_filename}"'
 
-            return Response(content=response.content, status_code=response.status_code, headers=headers)
+            async def stream_generator():
+                try:
+                    async for chunk in response.aiter_bytes():
+                        yield chunk
+                finally:
+                    await response.aclose()
+                    await client.aclose()
+
+            return StreamingResponse(content=stream_generator(), status_code=response.status_code, headers=headers)
+        except Exception:
+            # Ensure we clean up response if it was created, and always clean up client on failure
+            if 'response' in locals():
+                await response.aclose()
+            await client.aclose()
+            raise
     except HTTPException:
         raise
     except Exception as e:
