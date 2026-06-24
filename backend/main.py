@@ -395,38 +395,69 @@ async def download_endpoint(url: str):
     if not valid:
         raise HTTPException(status_code=400, detail=reason)
 
+    client = httpx.AsyncClient(follow_redirects=True, event_hooks={"request": [check_url_hook]})
+    response = None
     try:
-        async with httpx.AsyncClient(follow_redirects=True, event_hooks={"request": [check_url_hook]}) as client:
-            response = await client.get(url)
-            response.raise_for_status()
+        req = client.build_request("GET", url)
+        response = await client.send(req, stream=True)
+        response.raise_for_status()
 
-            # Use a strict allow-list for upstream headers to prevent Header Injection (e.g., Set-Cookie, XSS)
-            safe_headers = {"content-type", "content-length"}
-            headers: dict[str, str] = {
-                k.lower(): v for k, v in response.headers.items() if k.lower() in safe_headers
-            }
-            if "content-type" not in headers:
-                headers["content-type"] = "application/octet-stream"
+        # Use a strict allow-list for upstream headers to prevent Header Injection (e.g., Set-Cookie, XSS)
+        safe_headers = {"content-type", "content-length"}
+        headers: dict[str, str] = {
+            k.lower(): v for k, v in response.headers.items() if k.lower() in safe_headers
+        }
+        if "content-type" not in headers:
+            headers["content-type"] = "application/octet-stream"
 
-            # Suggest a filename from the URL or Content-Disposition
-            content_disposition = response.headers.get("content-disposition")
-            if content_disposition:
-                # Sanitize upstream header to prevent HTTP header injection
-                sanitized_disposition = re.sub(r'[\r\n]', '', content_disposition)
-                headers["content-disposition"] = sanitized_disposition
-            else:
-                filename = url.split("/")[-1]
-                if not filename or "?" in filename:
-                    filename = "downloaded_file"
+        # Suggest a filename from the URL or Content-Disposition
+        content_disposition = response.headers.get("content-disposition")
+        if content_disposition:
+            # Sanitize upstream header to prevent HTTP header injection
+            sanitized_disposition = re.sub(r'[\r\n]', '', content_disposition)
+            headers["content-disposition"] = sanitized_disposition
+        else:
+            filename = url.split("/")[-1]
+            if not filename or "?" in filename:
+                filename = "downloaded_file"
 
-                # Sanitize filename to prevent HTTP header injection and escaping quotes
-                sanitized_filename = re.sub(r'[\r\n"]', '_', filename)
-                headers["content-disposition"] = f'attachment; filename="{sanitized_filename}"'
+            # Sanitize filename to prevent HTTP header injection and escaping quotes
+            sanitized_filename = re.sub(r'[\r\n"]', '_', filename)
+            headers["content-disposition"] = f'attachment; filename="{sanitized_filename}"'
 
-            return Response(content=response.content, status_code=response.status_code, headers=headers)
+        async def _stream_generator():
+            try:
+                # Need to use 'response' from the outer scope, which is technically modified above.
+                # However since it's an object reference and this function is awaited after 'response' is fully bound,
+                # Python handles this closure correctly.
+                # Adding a small type assertion for linters:
+                assert response is not None
+                async for chunk in response.aiter_bytes():
+                    yield chunk
+            finally:
+                if response is not None:
+                    await response.aclose()
+                await client.aclose()
+
+        return StreamingResponse(_stream_generator(), status_code=response.status_code, headers=headers)
     except HTTPException:
+        # If it's already an HTTP exception (like a redirect loop or explicit raise), re-raise but clean up
+        if response is not None:
+            await response.aclose()
+        await client.aclose()
         raise
+    except httpx.HTTPStatusError as e:
+        # Handle explicitly HTTPStatusErrors thrown by response.raise_for_status()
+        if response is not None:
+            await response.aclose()
+        await client.aclose()
+        logger.error(f"Download failed with upstream error: {e}")
+        raise HTTPException(status_code=400, detail="Download failed due to an internal error.")
     except Exception as e:
+        # General cleanup
+        if response is not None:
+            await response.aclose()
+        await client.aclose()
         logger.error(f"Download failed: {e}")
         raise HTTPException(status_code=400, detail="Download failed due to an internal error.")
 
