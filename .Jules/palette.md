@@ -30,3 +30,6 @@
 **Learning:** In UI lists or chat streams where each result generates identical action buttons (e.g., 'Download File'), relying solely on the visible button text creates an accessibility failure. A screen reader user navigating by interactive elements will just hear "Download File" repeated with no context of *which* file they are downloading.
 
 **Action:** Whenever implementing lists or repeating elements with identical action buttons, always inject contextual payload data into a dynamic `aria-label` (e.g., `aria-label={`Download ${bookName}`}`) to ensure screen reader users can distinguish between them.
+## 2024-06-25 - Chat UI Accessibility
+**Learning:** Found missing ARIA live regions for the chat stream, non-semantic lists for action items, and text overflow issues in chat messages.
+**Action:** Always apply role="log" and aria-live="polite" to chat streams, use semantic ul/li for lists, and apply break-words utility to prevent overflow.
