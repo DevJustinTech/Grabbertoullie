@@ -396,39 +396,61 @@ async def download_endpoint(url: str):
         raise HTTPException(status_code=400, detail=reason)
 
     try:
-        async with httpx.AsyncClient(follow_redirects=True, event_hooks={"request": [check_url_hook]}) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-
-            # Use a strict allow-list for upstream headers to prevent Header Injection (e.g., Set-Cookie, XSS)
-            safe_headers = {"content-type", "content-length"}
-            headers: dict[str, str] = {
-                k.lower(): v for k, v in response.headers.items() if k.lower() in safe_headers
-            }
-            if "content-type" not in headers:
-                headers["content-type"] = "application/octet-stream"
-
-            # Suggest a filename from the URL or Content-Disposition
-            content_disposition = response.headers.get("content-disposition")
-            if content_disposition:
-                # Sanitize upstream header to prevent HTTP header injection
-                sanitized_disposition = re.sub(r'[\r\n]', '', content_disposition)
-                headers["content-disposition"] = sanitized_disposition
-            else:
-                filename = url.split("/")[-1]
-                if not filename or "?" in filename:
-                    filename = "downloaded_file"
-
-                # Sanitize filename to prevent HTTP header injection and escaping quotes
-                sanitized_filename = re.sub(r'[\r\n"]', '_', filename)
-                headers["content-disposition"] = f'attachment; filename="{sanitized_filename}"'
-
-            return Response(content=response.content, status_code=response.status_code, headers=headers)
+        # Explicitly instantiate the client outside of 'async with' so we can close it after StreamingResponse completes
+        client = httpx.AsyncClient(follow_redirects=True, event_hooks={"request": [check_url_hook]})
+        request = client.build_request("GET", url)
+        response = await client.send(request, stream=True)
+        response.raise_for_status()
     except HTTPException:
+        if 'response' in locals():
+            await response.aclose()
+        if 'client' in locals():
+            await client.aclose()
         raise
     except Exception as e:
-        logger.error(f"Download failed: {e}")
+        if 'response' in locals():
+            await response.aclose()
+        if 'client' in locals():
+            await client.aclose()
+        logger.error(f"Download setup failed: {e}")
         raise HTTPException(status_code=400, detail="Download failed due to an internal error.")
+
+    # Use a strict allow-list for upstream headers to prevent Header Injection (e.g., Set-Cookie, XSS)
+    safe_headers = {"content-type", "content-length"}
+    headers: dict[str, str] = {
+        k.lower(): v for k, v in response.headers.items() if k.lower() in safe_headers
+    }
+    if "content-type" not in headers:
+        headers["content-type"] = "application/octet-stream"
+
+    # Suggest a filename from the URL or Content-Disposition
+    content_disposition = response.headers.get("content-disposition")
+    if content_disposition:
+        # Sanitize upstream header to prevent HTTP header injection
+        sanitized_disposition = re.sub(r'[\r\n]', '', content_disposition)
+        headers["content-disposition"] = sanitized_disposition
+    else:
+        filename = url.split("/")[-1]
+        if not filename or "?" in filename:
+            filename = "downloaded_file"
+
+        # Sanitize filename to prevent HTTP header injection and escaping quotes
+        sanitized_filename = re.sub(r'[\r\n"]', '_', filename)
+        headers["content-disposition"] = f'attachment; filename="{sanitized_filename}"'
+
+    async def stream_generator():
+        try:
+            async for chunk in response.aiter_bytes():
+                yield chunk
+        finally:
+            await response.aclose()
+            await client.aclose()
+
+    return StreamingResponse(
+        stream_generator(),
+        status_code=response.status_code,
+        headers=headers
+    )
 
 @app.get("/webhook")
 async def verify_webhook(request: Request):

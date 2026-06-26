@@ -47,3 +47,8 @@
 **Vulnerability:** The backend download proxy blindly copied all upstream HTTP response headers, leading to a potential Header Injection vulnerability (including `Set-Cookie` and XSS vectors).
 **Learning:** Automatically forwarding upstream headers in a proxy can inadvertently leak or inject headers that bypass security mechanisms on the proxy's domain.
 **Prevention:** Always employ a strict allow-list of known safe headers (e.g., `content-type`, `content-length`), ensure safe fallback defaults, and normalize header keys to lowercase when merging.
+
+## 2025-06-26 - Streaming Response to Prevent Proxy Resource Exhaustion
+**Vulnerability:** The proxy endpoint `/api/download` buffered the entire file payload into memory using `response.content`, exposing the server to severe memory exhaustion/DoS when handling large file downloads.
+**Learning:** Buffering large files in memory during proxy operations scales poorly and creates a DoS vector.
+**Prevention:** Use `client.send(..., stream=True)` paired with FastAPI's `StreamingResponse` to process file downloads in chunks, drastically reducing memory overhead. Ensure the explicit `httpx` client handles connection closures properly upon streaming completion or failure.
