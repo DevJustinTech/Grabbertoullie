@@ -47,3 +47,8 @@
 **Vulnerability:** The backend download proxy blindly copied all upstream HTTP response headers, leading to a potential Header Injection vulnerability (including `Set-Cookie` and XSS vectors).
 **Learning:** Automatically forwarding upstream headers in a proxy can inadvertently leak or inject headers that bypass security mechanisms on the proxy's domain.
 **Prevention:** Always employ a strict allow-list of known safe headers (e.g., `content-type`, `content-length`), ensure safe fallback defaults, and normalize header keys to lowercase when merging.
+
+## 2024-05-28 - DoS via Memory Exhaustion in File Proxy
+**Vulnerability:** The proxy endpoint `/api/download` buffered the entire file content in memory via `response.content`, leading to a Denial of Service via memory exhaustion for large file downloads.
+**Learning:** Using `response.content` when proxying downloads is a critical error since large files (e.g., 100MB+) will consume server RAM relative to the number of concurrent users.
+**Prevention:** Always use `StreamingResponse` to chunk HTTP file transfers when acting as a proxy.
