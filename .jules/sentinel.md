@@ -47,3 +47,8 @@
 **Vulnerability:** The backend download proxy blindly copied all upstream HTTP response headers, leading to a potential Header Injection vulnerability (including `Set-Cookie` and XSS vectors).
 **Learning:** Automatically forwarding upstream headers in a proxy can inadvertently leak or inject headers that bypass security mechanisms on the proxy's domain.
 **Prevention:** Always employ a strict allow-list of known safe headers (e.g., `content-type`, `content-length`), ensure safe fallback defaults, and normalize header keys to lowercase when merging.
+
+## 2025-05-29 - Parameter Injection via Manual String Replacements
+**Vulnerability:** Replacing spaces with '+' or '%20' manually using '.replace()' instead of proper URL encoding allowed for URL parameter injection and SSRF-adjacent attacks when forming requests to 3rd-party services.
+**Learning:** When building HTTP requests to third-party endpoints, manual string replacements (e.g., replace(' ', '+')) do not adequately escape special characters (like '&', '=', or '#'), permitting injection of additional parameters into the URL.
+**Prevention:** Always use standard library functions like 'urllib.parse.quote' or 'urllib.parse.quote_plus' to properly escape all special characters when injecting user input into URLs.

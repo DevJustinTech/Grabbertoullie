@@ -21,6 +21,7 @@ import asyncio
 import argparse
 from dataclasses import dataclass, asdict
 from typing import Optional
+from urllib.parse import quote
 
 from playwright.async_api import async_playwright  # pyre-ignore
 from bs4 import BeautifulSoup  # pyre-ignore
@@ -94,7 +95,7 @@ async def search_books(
     """
     Search Z-Library. Returns list of BookResult dicts.
     """
-    q = query.strip().replace(" ", "%20")
+    q = quote(query.strip())
 
     results = []
 

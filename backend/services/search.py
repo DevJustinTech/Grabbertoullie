@@ -6,6 +6,7 @@ import logging
 import asyncio
 from typing import Dict, Any, List, Optional, Tuple
 from bs4 import BeautifulSoup # type: ignore
+from urllib.parse import quote_plus, quote
 from zlib_scraper import search_books, get_book_info
 from services.security import check_url_hook
 
@@ -28,9 +29,9 @@ async def search_open_library(title: str, author: str = "") -> List[Dict[str, An
 
     query = []
     if title:
-        query.append(f"title={title.replace(' ', '+')}")
+        query.append(f"title={quote_plus(title)}")
     if author:
-        query.append(f"author={author.replace(' ', '+')}")
+        query.append(f"author={quote_plus(author)}")
 
     if not query:
         return []
@@ -73,7 +74,7 @@ async def search_standard_ebooks(title: str) -> List[Dict[str, Any]]:
     logger.info(f"Searching Standard Ebooks for title='{title}'")
     results = []
 
-    url = f"https://standardebooks.org/ebooks?query={title.replace(' ', '+')}"
+    url = f"https://standardebooks.org/ebooks?query={quote_plus(title)}"
 
     try:
         client = get_shared_client()
@@ -144,7 +145,7 @@ async def search_project_gutenberg(title: str, author: str = "") -> List[Dict[st
         return results
 
     query_str = " ".join(query_parts)
-    url = f"https://gutendex.com/books?search={query_str.replace(' ', '%20')}"
+    url = f"https://gutendex.com/books?search={quote(query_str)}"
 
     try:
         client = get_shared_client()
@@ -198,7 +199,7 @@ async def search_semantic_scholar(title: str, author: str = "") -> List[Dict[str
         return results
 
     query_str = " ".join(query_parts)
-    url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={query_str.replace(' ', '%20')}&fields=title,authors,year,isOpenAccess,openAccessPdf&limit=5"
+    url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={quote(query_str)}&fields=title,authors,year,isOpenAccess,openAccessPdf&limit=5"
 
     try:
         client = get_shared_client()

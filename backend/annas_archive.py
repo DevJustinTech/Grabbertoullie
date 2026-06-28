@@ -22,6 +22,7 @@ import argparse
 from collections import defaultdict
 from dataclasses import dataclass, asdict
 from typing import Optional
+from urllib.parse import quote_plus
 
 from playwright.async_api import async_playwright  # pyre-ignore
 from bs4 import BeautifulSoup
@@ -100,7 +101,7 @@ async def search_books(
         sort:           "newest" | "oldest" | "largest" | "smallest" | ""
         enable_filters: False = plain search with no filters
     """
-    q = query.strip().replace(" ", "+")
+    q = quote_plus(query.strip())
 
     if not enable_filters or not any([content, sort, file_type]):
         url = f"{BASE_URL}/search?q={q}"
