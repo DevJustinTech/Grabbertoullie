@@ -257,7 +257,7 @@ export default function Home() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 pb-32 pt-8">
-        <div className="max-w-3xl mx-auto space-y-8">
+        <div className="max-w-3xl mx-auto space-y-8" role="log" aria-live="polite">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center mt-20 text-center space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
               <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mb-2">
