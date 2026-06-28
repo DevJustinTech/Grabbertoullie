@@ -22,3 +22,6 @@
 ## 2024-05-27 - Parallel Scraping in Standard Ebooks
 **Learning:** In `search_standard_ebooks` (`backend/services/search.py`), the function was iteratively awaiting `client.get(book_url)` for the top 5 candidates. This sequential fetching caused a compounded latency of ~5x network round-trips.
 **Action:** Used `asyncio.gather` with a helper async function (`_fetch_se_info`) to execute those HTTP requests concurrently, reducing latency.
+## 2025-02-28 - Streaming Large File Downloads
+**Learning:** Loading large file responses directly into memory via `response.content` in `httpx` and returning a standard `Response` causes extreme memory usage and performance bottlenecks for large downloads.
+**Action:** Use `client.send(request, stream=True)` with a `StreamingResponse` and `aiter_bytes()` to stream file downloads. Ensure `httpx.AsyncClient` is manually instantiated and closed in a `finally` block or on exception to prevent unclosed connections.
