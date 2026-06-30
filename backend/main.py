@@ -437,7 +437,12 @@ async def verify_webhook(request: Request):
     challenge = request.query_params.get("hub.challenge")
 
     if mode and token:
-        if mode == "subscribe" and token == WHATSAPP_VERIFY_TOKEN:
+        # Prevent timing attacks and fail closed if token is missing
+        if not WHATSAPP_VERIFY_TOKEN:
+            logger.error("WHATSAPP_VERIFY_TOKEN is not configured.")
+            raise HTTPException(status_code=500, detail="Server misconfiguration")
+
+        if mode == "subscribe" and hmac.compare_digest(token, WHATSAPP_VERIFY_TOKEN):
             return Response(content=challenge, status_code=200)
         else:
             raise HTTPException(status_code=403, detail="Verification failed")
@@ -452,15 +457,19 @@ async def handle_webhook(request: Request):
 
     raw_body = await request.body()
 
-    if WHATSAPP_APP_SECRET:
-        expected_signature = hmac.new(
-            WHATSAPP_APP_SECRET.encode("utf-8"),
-            raw_body,
-            hashlib.sha256
-        ).hexdigest()
+    # Fail closed to prevent auth bypass if secret is missing
+    if not WHATSAPP_APP_SECRET:
+        logger.error("WHATSAPP_APP_SECRET is not configured.")
+        raise HTTPException(status_code=500, detail="Server misconfiguration")
 
-        if not hmac.compare_digest(f"sha256={expected_signature}", signature_header):
-            raise HTTPException(status_code=403, detail="Invalid signature")
+    expected_signature = hmac.new(
+        WHATSAPP_APP_SECRET.encode("utf-8"),
+        raw_body,
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(f"sha256={expected_signature}", signature_header):
+        raise HTTPException(status_code=403, detail="Invalid signature")
 
     # Proceed with parsing the body
     body = await request.json()

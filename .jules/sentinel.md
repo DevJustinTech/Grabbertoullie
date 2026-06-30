@@ -47,3 +47,8 @@
 **Vulnerability:** The backend download proxy blindly copied all upstream HTTP response headers, leading to a potential Header Injection vulnerability (including `Set-Cookie` and XSS vectors).
 **Learning:** Automatically forwarding upstream headers in a proxy can inadvertently leak or inject headers that bypass security mechanisms on the proxy's domain.
 **Prevention:** Always employ a strict allow-list of known safe headers (e.g., `content-type`, `content-length`), ensure safe fallback defaults, and normalize header keys to lowercase when merging.
+
+## 2024-07-01 - [Webhook Authentication Bypass]
+**Vulnerability:** The WhatsApp webhook endpoints in `backend/main.py` failed to validate incoming requests correctly if the required secrets (`WHATSAPP_VERIFY_TOKEN` and `WHATSAPP_APP_SECRET`) were missing or unconfigured, leading to an authentication bypass. Additionally, the GET endpoint used a direct string comparison (`==`) for the verification token, which is susceptible to timing attacks.
+**Learning:** When validating external webhooks, failing closed (e.g., HTTP 500) if required secrets are missing is crucial to prevent bypasses. Furthermore, using `hmac.compare_digest` for cryptographic tokens prevents timing attacks.
+**Prevention:** Ensure the application fails closed if required secrets are missing, and use `hmac.compare_digest` for all cryptographic token comparisons.
