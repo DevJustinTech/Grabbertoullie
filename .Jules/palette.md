@@ -30,3 +30,9 @@
 **Learning:** In UI lists or chat streams where each result generates identical action buttons (e.g., 'Download File'), relying solely on the visible button text creates an accessibility failure. A screen reader user navigating by interactive elements will just hear "Download File" repeated with no context of *which* file they are downloading.
 
 **Action:** Whenever implementing lists or repeating elements with identical action buttons, always inject contextual payload data into a dynamic `aria-label` (e.g., `aria-label={`Download ${bookName}`}`) to ensure screen reader users can distinguish between them.
+
+## 2025-03-05 - Semantic Action Lists for Accessibility
+
+**Learning:** When rendering lists of actionable items in the UI (like disambiguation candidates), using a generic `div` container with buttons creates an unsemantic list for screen reader users, making it harder to navigate and understand the count of items.
+
+**Action:** Always structure lists of actionable UI items within semantic `<ul>` and `<li>` tags to improve screen reader accessibility. Ensure the interactive children stretch to fill the item (e.g., using `w-full`) to maintain layout and hit areas.
