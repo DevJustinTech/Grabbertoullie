@@ -30,3 +30,6 @@
 **Learning:** In UI lists or chat streams where each result generates identical action buttons (e.g., 'Download File'), relying solely on the visible button text creates an accessibility failure. A screen reader user navigating by interactive elements will just hear "Download File" repeated with no context of *which* file they are downloading.
 
 **Action:** Whenever implementing lists or repeating elements with identical action buttons, always inject contextual payload data into a dynamic `aria-label` (e.g., `aria-label={`Download ${bookName}`}`) to ensure screen reader users can distinguish between them.
+## 2024-07-02 - Live Chat Screen Reader Accessibility
+**Learning:** When building live chat interfaces, screen readers do not automatically announce new messages as they appear in the DOM. This leaves visually impaired users unaware of bot responses or disambiguation options.
+**Action:** Always apply `role="log"` and `aria-live="polite"` to the container wrapping the chat messages so that screen readers announce incoming messages naturally without interrupting the user.
