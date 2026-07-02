@@ -1,0 +1,14 @@
+
+> frontend@0.1.0 dev /app/frontend
+> next dev -p 3001
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3001
+  - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 2.5s
+ ○ Compiling / ...
+ ✓ Compiled / in 5.6s (514 modules)
+ ✓ Compiled in 541ms (243 modules)
+ GET / 200 in 6158ms
