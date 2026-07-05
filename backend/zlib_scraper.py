@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import argparse
+import urllib.parse
 from dataclasses import dataclass, asdict
 from typing import Optional
 
@@ -94,7 +95,7 @@ async def search_books(
     """
     Search Z-Library. Returns list of BookResult dicts.
     """
-    q = query.strip().replace(" ", "%20")
+    q = urllib.parse.quote(query.strip())
 
     results = []
 

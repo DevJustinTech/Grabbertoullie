@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import argparse
+import urllib.parse
 from collections import defaultdict
 from dataclasses import dataclass, asdict
 from typing import Optional
@@ -100,7 +101,7 @@ async def search_books(
         sort:           "newest" | "oldest" | "largest" | "smallest" | ""
         enable_filters: False = plain search with no filters
     """
-    q = query.strip().replace(" ", "+")
+    q = urllib.parse.quote_plus(query.strip())
 
     if not enable_filters or not any([content, sort, file_type]):
         url = f"{BASE_URL}/search?q={q}"
