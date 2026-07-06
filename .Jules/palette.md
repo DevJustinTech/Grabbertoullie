@@ -30,3 +30,8 @@
 **Learning:** In UI lists or chat streams where each result generates identical action buttons (e.g., 'Download File'), relying solely on the visible button text creates an accessibility failure. A screen reader user navigating by interactive elements will just hear "Download File" repeated with no context of *which* file they are downloading.
 
 **Action:** Whenever implementing lists or repeating elements with identical action buttons, always inject contextual payload data into a dynamic `aria-label` (e.g., `aria-label={`Download ${bookName}`}`) to ensure screen reader users can distinguish between them.
+## 2025-03-06 - Semantic Lists and Chat Live Regions
+
+**Learning:** In chat interfaces, new messages appended to the DOM are not naturally announced by screen readers. Applying `role="log"` and `aria-live="polite"` to the message container ensures new messages are automatically announced. Additionally, when rendering lists of actionable items (like disambiguation candidates), structuring them with semantic `<ul>` and `<li>` tags instead of generic `<div>`s improves screen reader navigation by accurately announcing the total number of options and their list semantics.
+
+**Action:** Always apply `role="log"` and `aria-live="polite"` to live chat message containers. When rendering interactive lists, use semantic HTML lists (`<ul>`/`<ol>`) and ensure interactive children (like buttons) stretch to fill the item (`w-full`) to maintain layout and hit areas.
