@@ -377,6 +377,103 @@ def _extract_download_url(html: str) -> Optional[str]:
     return None
 
 
+# ── Slow-download resolver (headed browser) ──────────────────────────────────
+
+# Anna's Archive protects its "slow download" partner-server pages with a
+# browser-verification challenge that a *headless* browser cannot pass, so the
+# resolver launches a headed (visible) browser by default. Override with the
+# ANNAS_HEADLESS=1 environment variable (not recommended — the challenge will
+# usually fail headless).
+import os as _os
+
+_ANNAS_HEADLESS = _os.getenv("ANNAS_HEADLESS", "0") == "1"
+
+# Footer/nav links that live on the slow_download page but are NOT the file.
+_NON_FILE_HOSTS = ("wikipedia.org", "reddit.com", "t.me", "annas-archive")
+
+
+async def _extract_download_now(page) -> Optional[str]:
+    """Return the direct file URL from a resolved slow_download page, if present."""
+    # Preferred: the anchor whose text is "Download now".
+    hrefs = await page.eval_on_selector_all(
+        "a",
+        "els => els.filter(e => /download now/i.test(e.textContent || '')).map(e => e.href)"
+    )
+    for h in hrefs:
+        if h and not any(host in h for host in _NON_FILE_HOSTS):
+            return h
+
+    # Fallback: any external link that points straight at a book file.
+    all_hrefs = await page.eval_on_selector_all("a[href^='http']", "els => els.map(e => e.href)")
+    for h in all_hrefs:
+        if any(host in h for host in _NON_FILE_HOSTS):
+            continue
+        path = h.lower().split("?")[0]
+        if any(path.endswith(f".{ext}") for ext in ("pdf", "epub", "mobi", "azw3", "cbr", "cbz")):
+            return h
+    return None
+
+
+async def _try_slow_server(page, md5: str, server: int, poll_seconds: int = 30) -> Optional[str]:
+    """Open one slow-download partner page and wait for its direct link to appear."""
+    target = f"{BASE_URL}/slow_download/{md5}/0/{server}"
+    await page.goto(target, wait_until="domcontentloaded", timeout=30000)
+
+    waited = 0.0
+    while waited < poll_seconds:
+        await page.wait_for_timeout(2500)
+        waited += 2.5
+        try:
+            body = (await page.inner_text("body")).lower()
+            # Headless challenge dead-end — bail immediately so we can try elsewhere.
+            if "could not verify your browser" in body:
+                return None
+            link = await _extract_download_now(page)
+            if link:
+                return link
+        except Exception:
+            # The countdown page navigates/refreshes to reveal the link, which can
+            # destroy the execution context mid-read. Ignore and retry next poll.
+            continue
+    return None
+
+
+async def resolve_slow_download(md5: str, servers=(0, 1, 2, 3), headless: Optional[bool] = None) -> Optional[str]:
+    """
+    Resolve a book's direct download URL from Anna's Archive by driving the
+    slow-download flow in a real browser: load the /md5/ page, open a partner
+    server, wait for the browser check + countdown to clear, and read out the
+    revealed "Download now" link. Tries several partner servers in order.
+    """
+    if headless is None:
+        headless = _ANNAS_HEADLESS
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=headless,
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        context = await browser.new_context(
+            user_agent=HEADERS["User-Agent"],
+            extra_http_headers={"Accept-Language": HEADERS["Accept-Language"]},
+        )
+        page = await context.new_page()
+        try:
+            await page.goto(f"{BASE_URL}/md5/{md5}", wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(1500)
+            for server in servers:
+                try:
+                    link = await _try_slow_server(page, md5, server)
+                    if link:
+                        return link
+                except Exception as exc:
+                    print(f"slow server {server} failed: {exc}")
+                    continue
+            return None
+        finally:
+            await browser.close()
+
+
 # ── One-shot convenience ──────────────────────────────────────────────────────
 
 async def find_best_download(query: str, file_type: str = "epub") -> Optional[dict]:

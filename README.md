@@ -1,11 +1,10 @@
 # Grabbertoullie
 
-This project is a full-stack Next.js and FastAPI web application that functions as a book retrieval agent. It can be accessed via a sleek web UI or integrated with WhatsApp. The agent takes a command (e.g., "grab The Great Gatsby pdf"), uses the Groq LLM to parse the intent, searches the web (specifically leveraging Z-Library and Anna's Archive via custom scrapers) for a direct download link, and provides the file to the user.
+This project is a full-stack Next.js and FastAPI web application that functions as a book retrieval agent. Accessed via a sleek web UI, the agent takes a command (e.g., "grab The Great Gatsby pdf"), uses the Groq LLM to parse the intent, searches multiple book sources in parallel for a direct download link, and provides the file to the user.
 
 ## Capabilities
 - **Web Interface:** A sleek, modern chat interface built with Next.js and Tailwind CSS.
-- **WhatsApp Integration:** Built-in webhooks to connect to Meta's WhatsApp Cloud API. Automatically sends small files (<45MB) as direct document messages, or provides the URL for larger files.
-- **AI-Powered Search:** Leverages Groq to intelligently parse search requests, and custom scrapers to find direct file links (PDF/EPUB) from sites like Z-Library and Anna's Archive.
+- **AI-Powered Search:** Leverages Groq to intelligently parse search requests, then searches several sources in parallel — Anna's Archive, Z-Library, Open Library, Project Gutenberg, Standard Ebooks, and Semantic Scholar — to find direct file links (PDF/EPUB).
 - **SSRF Protection:** A secure backend proxy to download files safely, bypassing CORS issues on the frontend.
 - **CLI Scrapers:** Standalone CLI tools for running direct book searches without the full application.
 
@@ -29,7 +28,7 @@ Navigate to the `backend` folder and copy `.env.example` to `.env`:
 cd backend
 cp .env.example .env
 ```
-Fill in your API keys in `backend/.env`. (Groq API keys are required for full functionality. WhatsApp variables are required for the WhatsApp webhook integration).
+Fill in your API keys in `backend/.env`. A Groq API key enables AI-powered query parsing; without it, the app falls back to a simple built-in metadata parser.
 
 If you are changing the backend URL, you may also need to set `NEXT_PUBLIC_API_URL` in the frontend environment variables.
 
@@ -55,8 +54,6 @@ The frontend will run on `http://localhost:3001` (or whichever port Next.js allo
 
 ### Usage
 Open your browser and navigate to the frontend URL (e.g. `http://localhost:3001`). Type a command in the chat to start searching for books!
-
-To use the WhatsApp integration, ensure your webhook is configured to point to `http://<your_backend_domain>/webhook` and your Meta Developer app has the necessary tokens configured in your backend `.env`.
 
 ## CLI Scraper Commands
 

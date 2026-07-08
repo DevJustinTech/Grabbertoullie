@@ -10,6 +10,7 @@ from playwright.async_api import async_playwright
 # pyre-ignore[21]
 from .search import (
     search_zlibrary,
+    search_annas_archive,
     search_open_library,
     search_standard_ebooks,
     search_project_gutenberg,
@@ -62,6 +63,12 @@ async def validate_url(url: str) -> bool:
     if not url:
         return False
 
+    # Anna's Archive detail pages sit behind a browser-verification challenge that
+    # blocks HEAD/GET probes, but we already know the book exists from the search
+    # results, so treat these links as valid and let the user open them directly.
+    if "annas-archive" in url:
+        return True
+
     # Check if this is a Z-Library domain
     if any(domain in url for domain in ["z-lib", "z-library", "1lib"]):
         return await _validate_zlib_url(url)
@@ -87,6 +94,7 @@ async def perform_parallel_search(metadata: Dict[str, Any]) -> List[Dict[str, An
 
     results = await asyncio.gather(
         search_zlibrary(title, author, metadata.get("format", "any")),
+        search_annas_archive(title, author, metadata.get("format", "any")),
         search_open_library(title, author),
         search_standard_ebooks(title),
         search_project_gutenberg(title, author),

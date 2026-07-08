@@ -7,6 +7,7 @@ import asyncio
 from typing import Dict, Any, List, Optional, Tuple
 from bs4 import BeautifulSoup # type: ignore
 from zlib_scraper import search_books, get_book_info
+from annas_archive import search_books as annas_search_books
 
 logger = logging.getLogger(__name__)
 
@@ -292,6 +293,55 @@ async def search_zlibrary(title: str, author: str = "", fmt: str = "any") -> Lis
 
     except Exception as e:
         logger.error(f"Z-Library search failed: {e}")
+
+    return results
+
+
+async def search_annas_archive(title: str, author: str = "", fmt: str = "any") -> List[Dict[str, Any]]:
+    logger.info(f"Searching Anna's Archive for title='{title}', author='{author}', format='{fmt}'")
+    results = []
+
+    query_parts = []
+    if title:
+        query_parts.append(title)
+    if author:
+        query_parts.append(author)
+
+    if not query_parts:
+        return results
+
+    query_str = " ".join(query_parts)
+
+    file_type = ""
+    if fmt and fmt.lower() in ["pdf", "epub"]:
+        file_type = fmt.lower()
+
+    try:
+        annas_results = await annas_search_books(query_str, file_type=file_type)
+
+        # Anna's Archive protects its download mirrors behind a browser-verification
+        # challenge that can't be resolved headlessly, so we surface the book's
+        # detail page (/md5/...) as the link and let the user complete the download
+        # there. The frontend opens Anna's Archive links directly in a new tab.
+        for item in annas_results[:5]:
+            link = item.get("link")
+            if not link:
+                continue
+
+            item_format = item.get("format", "").lower()
+
+            results.append({
+                "source": "Anna's Archive",
+                "title": item.get("title", ""),
+                "author": item.get("author", ""),
+                "year": "",
+                "pdf_url": link if item_format == "pdf" else "",
+                "epub_url": link if item_format == "epub" else "",
+                "weight": 4
+            })
+
+    except Exception as e:
+        logger.error(f"Anna's Archive search failed: {e}")
 
     return results
 
