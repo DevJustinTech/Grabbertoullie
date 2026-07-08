@@ -37,7 +37,7 @@ IMAGE_ID=$(oci compute image list \
   --shape "VM.Standard.A1.Flex" \
   --operating-system "Canonical Ubuntu" \
   --sort-by TIMECREATED \
-  | jq -r '[.data[] | select(.["display-name"] | test("22.04 Minimal aarch64"))][0].id')
+  | jq -r '[.data[] | select(.["display-name"] | test("22.04"))][0].id')
 echo "    image: $IMAGE_ID"
 
 echo "==> Discovering availability domains..."
