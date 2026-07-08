@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 
 interface DisambiguationCandidate {
   title: string;
@@ -24,6 +24,95 @@ interface ChatMessage {
   };
 }
 
+
+
+// ⚡ Bolt Performance Optimization:
+// Extracted individual chat messages into a React.memo component.
+// This prevents the entire message list from re-rendering on every keystroke
+// when the user is typing in the input field, significantly improving responsiveness
+// for long chat histories.
+const MessageItem = React.memo(({
+  msg,
+  isResolving,
+  onSendMessage,
+  onDownload
+}: {
+  msg: ChatMessage,
+  isResolving: boolean,
+  onSendMessage: (text: string) => void,
+  onDownload: (url: string, source?: string) => void
+}) => {
+  return (
+    <div
+      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
+        } animate-in fade-in slide-in-from-bottom-2 duration-300`}
+    >
+      <div
+        className={`max-w-[85%] sm:max-w-[75%] px-5 py-3.5 text-[15px] leading-relaxed flex flex-col gap-3 ${msg.role === "user"
+            ? "bg-zinc-900 text-white rounded-3xl rounded-tr-sm"
+            : "bg-white border border-zinc-200 text-zinc-800 rounded-3xl rounded-tl-sm shadow-sm"
+          }`}
+      >
+        <span className="sr-only">{msg.role === "user" ? "You said:" : "Bot said:"}</span>
+        <p className="whitespace-pre-wrap">{msg.content}</p>
+
+        {msg.result && msg.result.status === "disambiguation_required" && msg.result.candidates && (
+          <div className="flex flex-col gap-2 mt-2">
+            {msg.result.candidates.map((candidate, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  const formatSuffix = msg.result?.format && msg.result.format !== "any" ? ` ${msg.result.format}` : "";
+                  onSendMessage(`grab ${candidate.raw_title} by ${candidate.raw_author}${formatSuffix} [exact]`);
+                }}
+                className="text-left bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-800 py-2.5 px-4 rounded-xl transition-all duration-200 text-sm font-medium active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
+              >
+                {candidate.title}
+                {candidate.source && (
+                  <span className="block text-xs font-normal text-zinc-500 mt-0.5">Source: {candidate.source}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {msg.result && msg.result.status === "success" && msg.result.file_url && (
+          <div className="mt-2 pt-4 border-t border-zinc-100/20">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-medium uppercase tracking-wider text-zinc-500">Format</span>
+              <span className="text-xs font-semibold bg-zinc-100 text-zinc-700 px-2 py-1 rounded-md">{msg.result.extension?.toUpperCase()}</span>
+            </div>
+            <button
+              onClick={() => onDownload(msg.result!.file_url!, msg.result!.source)}
+              disabled={isResolving}
+              aria-label={`Download ${msg.result?.book_name || 'file'}`}
+              className="w-full bg-zinc-900 hover:bg-zinc-800 disabled:opacity-70 disabled:cursor-wait text-white py-2.5 px-4 rounded-xl transition-all duration-200 text-sm font-medium flex items-center justify-center gap-2 group active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
+            >
+              {isResolving ? (
+                <>
+                  <svg aria-hidden="true" className="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Preparing download…
+                </>
+              ) : (
+                <>
+                  <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 group-hover:-translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download File
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+MessageItem.displayName = 'MessageItem';
+
 export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -31,6 +120,7 @@ export default function Home() {
   const [streamStatus, setStreamStatus] = useState("");
   const [resolvingUrl, setResolvingUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -40,12 +130,29 @@ export default function Home() {
     scrollToBottom();
   }, [messages, loading, streamStatus]);
 
-  const handleSendMessage = (text: string) => {
-    if (!text.trim()) return;
-    sendMessage(text.trim());
-  };
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Focus input when '/' is pressed, unless user is already typing in an input/textarea
+      if (
+        e.key === "/" &&
+        document.activeElement?.tagName !== "INPUT" &&
+        document.activeElement?.tagName !== "TEXTAREA"
+      ) {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
 
-  const sendMessage = async (userMessage: string) => {
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
+
+
+
+
+  // ⚡ Bolt Performance Optimization:
+  // Wrapped in useCallback to maintain a stable reference for handleSendMessage.
+  const sendMessage = useCallback(async (userMessage: string) => {
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setLoading(true);
@@ -126,9 +233,9 @@ export default function Home() {
       setLoading(false);
       setStreamStatus("");
     }
-  };
+  }, []);
 
-  const openInNewTab = (url: string) => {
+  const openInNewTab = useCallback((url: string) => {
     const link = document.createElement("a");
     link.href = url;
     link.download = "";
@@ -137,22 +244,29 @@ export default function Home() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+  }, []);
 
-  const handleDownload = async (url: string, source?: string) => {
+  // Wrapped in useCallback to keep a stable reference for the memoized MessageItem.
+  const handleSendMessage = useCallback((text: string) => {
+    if (!text.trim() || loading) return;
+    sendMessage(text.trim());
+  }, [loading, sendMessage]);
+
+  // Resolve Anna's Archive downloads on demand: the URL is the book's /md5/ page,
+  // so we drive the slow-download flow on the backend (~10-30s) and open the
+  // resulting direct file URL. Other sources open/download directly.
+  const handleDownload = useCallback(async (url: string, source?: string) => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
     if (source === "Anna's Archive") {
-      // The `url` is the book's Anna's Archive page (/md5/<md5>). Resolving the
-      // real file link means driving the slow-download flow in a browser on the
-      // backend (~10-30s), so open a tab up front (avoids popup blocking) and
-      // point it at the direct URL once resolved.
       const md5 = url.split("/md5/")[1]?.split(/[/?#]/)[0];
       if (!md5) {
         openInNewTab(url);
         return;
       }
 
+      // Open a tab up front (in the click gesture) to avoid popup blocking,
+      // then point it at the direct URL once resolved.
       const win = window.open("", "_blank");
       setResolvingUrl(url);
       try {
@@ -185,7 +299,7 @@ export default function Home() {
 
     // Navigate to the download proxy endpoint to avoid CORS issues and force download
     window.location.href = `${apiUrl}/api/download?url=${encodeURIComponent(url)}`;
-  };
+  }, [openInNewTab]);
 
   return (
     <div className="flex flex-col h-screen bg-white text-zinc-900 font-sans selection:bg-zinc-200">
@@ -218,76 +332,13 @@ export default function Home() {
           )}
 
           {messages.map((msg, idx) => (
-            <div
+            <MessageItem
               key={idx}
-              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
-                } animate-in fade-in slide-in-from-bottom-2 duration-300`}
-            >
-              <div
-                className={`max-w-[85%] sm:max-w-[75%] px-5 py-3.5 text-[15px] leading-relaxed flex flex-col gap-3 ${msg.role === "user"
-                    ? "bg-zinc-900 text-white rounded-3xl rounded-tr-sm"
-                    : "bg-white border border-zinc-200 text-zinc-800 rounded-3xl rounded-tl-sm shadow-sm"
-                  }`}
-              >
-                <p className="whitespace-pre-wrap">{msg.content}</p>
-
-                {msg.result && msg.result.status === "disambiguation_required" && msg.result.candidates && (
-                  <div className="flex flex-col gap-2 mt-2">
-                    {msg.result.candidates.map((candidate, i) => (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          const formatSuffix = msg.result?.format && msg.result.format !== "any" ? ` ${msg.result.format}` : "";
-                          handleSendMessage(`grab ${candidate.raw_title} by ${candidate.raw_author}${formatSuffix} [exact]`);
-                        }}
-                        className="text-left bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-800 py-2.5 px-4 rounded-xl transition-all duration-200 text-sm font-medium active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
-                      >
-                        {candidate.title}
-                        {candidate.source && (
-                          <span className="block text-xs font-normal text-zinc-500 mt-0.5">Source: {candidate.source}</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {msg.result && msg.result.status === "success" && msg.result.file_url && (
-                  <div className="mt-2 pt-4 border-t border-zinc-100/20">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-medium uppercase tracking-wider text-zinc-500">Format</span>
-                      <span className="text-xs font-semibold bg-zinc-100 text-zinc-700 px-2 py-1 rounded-md">{msg.result.extension?.toUpperCase()}</span>
-                    </div>
-                    {(() => {
-                      const isResolving = resolvingUrl === msg.result!.file_url;
-                      return (
-                        <button
-                          onClick={() => handleDownload(msg.result!.file_url!, msg.result!.source)}
-                          disabled={isResolving}
-                          className="w-full bg-zinc-900 hover:bg-zinc-800 disabled:opacity-70 disabled:cursor-wait text-white py-2.5 px-4 rounded-xl transition-all duration-200 text-sm font-medium flex items-center justify-center gap-2 group active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
-                        >
-                          {isResolving ? (
-                            <>
-                              <svg aria-hidden="true" className="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                              Preparing download…
-                            </>
-                          ) : (
-                            <>
-                              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 group-hover:-translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                              </svg>
-                              Download File
-                            </>
-                          )}
-                        </button>
-                      );
-                    })()}
-                  </div>
-                )}
-              </div>
-            </div>
+              msg={msg}
+              isResolving={!!(msg.result?.file_url && resolvingUrl === msg.result.file_url)}
+              onSendMessage={handleSendMessage}
+              onDownload={handleDownload}
+            />
           ))}
           {loading && (
             <div className="flex justify-start animate-in fade-in duration-300">
@@ -314,23 +365,51 @@ export default function Home() {
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent pb-6 pt-10 px-4">
-        <div className="max-w-3xl mx-auto relative shadow-lg shadow-black/5 rounded-full">
+        <form
+          className="max-w-3xl mx-auto relative shadow-lg shadow-black/5 rounded-full"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSendMessage(input);
+          }}
+        >
           <input
+            ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSendMessage(input)}
             placeholder="Type your request here..."
             aria-label="Search for a book"
-            className="w-full bg-white border border-zinc-200 shadow-sm rounded-full pl-6 pr-14 py-4 focus:outline-none focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100 transition-all text-zinc-800 placeholder:text-zinc-400 text-[15px]"
-            disabled={loading}
+            aria-describedby="search-hint"
+            autoFocus
+            className="w-full bg-white border border-zinc-200 shadow-sm rounded-full pl-6 pr-24 py-4 focus:outline-none focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100 transition-all text-zinc-800 placeholder:text-zinc-400 text-[15px]"
           />
-          <button
-            onClick={() => handleSendMessage(input)}
-            disabled={loading || !input.trim()}
-            aria-label={loading ? "Sending request" : "Send request"}
-            className="absolute right-2 top-2 bottom-2 bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full w-10 flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
-          >
+
+          <div className="absolute right-2 top-2 bottom-2 flex items-center gap-1">
+            {input.trim() && !loading && (
+              <button
+                type="button"
+                onClick={() => {
+                  setInput("");
+                  inputRef.current?.focus();
+                }}
+                aria-label="Clear input"
+                title="Clear input"
+                className="text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 p-2 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
+              >
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || !input.trim()}
+              aria-label={loading ? "Sending request" : "Send request"}
+              title={loading ? "Sending request..." : !input.trim() ? "Type a message to send" : "Send request"}
+              className="bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full w-10 h-10 flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
+            >
             {loading ? (
               <svg aria-hidden="true" className="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -341,10 +420,13 @@ export default function Home() {
                 <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
               </svg>
             )}
-          </button>
-        </div>
-        <p className="text-center text-[11px] text-zinc-400 mt-3 font-medium">
-          Press Enter to send. For best results, specify the format (e.g. pdf, epub).
+            </button>
+          </div>
+        </form>
+        <p id="search-hint" className="text-center text-[11px] text-zinc-400 mt-3 font-medium flex items-center justify-center gap-1.5 flex-wrap">
+          Press <kbd className="px-1.5 py-0.5 text-[10px] font-sans bg-zinc-100 border border-zinc-200 text-zinc-500 rounded-md">Enter</kbd> to send.
+          Press <kbd className="px-1.5 py-0.5 text-[10px] font-sans bg-zinc-100 border border-zinc-200 text-zinc-500 rounded-md">/</kbd> to search.
+          For best results, specify the format (e.g. pdf).
         </p>
       </div>
     </div>

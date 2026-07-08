@@ -22,7 +22,13 @@ logger = logging.getLogger(__name__)
 
 # Shared client to prevent connection pooling and instantiation overhead
 # during concurrent URL validations.
-_shared_client = httpx.AsyncClient(event_hooks={"request": [check_url_hook]})
+_shared_client: httpx.AsyncClient | None = None
+
+def get_shared_client() -> httpx.AsyncClient:
+    global _shared_client
+    if _shared_client is None or _shared_client.is_closed:
+        _shared_client = httpx.AsyncClient(event_hooks={"request": [check_url_hook]})
+    return _shared_client
 
 async def _validate_zlib_url(url: str) -> bool:
     """
@@ -74,9 +80,10 @@ async def validate_url(url: str) -> bool:
         return await _validate_zlib_url(url)
 
     try:
-        r = await _shared_client.head(url, timeout=5, follow_redirects=True)
+        client = get_shared_client()
+        r = await client.head(url, timeout=5, follow_redirects=True)
         if r.status_code == 405:
-            async with _shared_client.stream("GET", url, timeout=5, follow_redirects=True) as r_get:
+            async with client.stream("GET", url, timeout=5, follow_redirects=True) as r_get:
                 return r_get.status_code < 400
         return r.status_code < 400
     except Exception as e:

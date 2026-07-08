@@ -14,3 +14,19 @@
 **Learning:** Static examples in empty states (like "Try searching for...") ask users to do unnecessary work (typing the example). Users often want a quick, zero-friction way to see how the app works on their first visit.
 
 **Action:** Whenever possible, convert static example queries or actions in empty states into interactive, one-click buttons that automatically populate and submit the form. This provides immediate value and reduces the barrier to first interaction.
+## 2025-03-04 - Keyboard Shortcuts Discovery & Accessibility
+
+**Learning:** When adding global keyboard shortcuts (like `/` to search/focus) to a React application, it is important to prevent default behaviors but more critically, avoid intercepting the keystroke when a user is already typing in an input or textarea element. This ensures the shortcut does not break regular text entry. Additionally, visual hints using styled `<kbd>` tags provide a great way to introduce "power-user" features organically without overwhelming the layout.
+
+**Action:** Whenever implementing a global keyboard shortcut (e.g., using a window event listener inside a `useEffect`), always include a check against `document.activeElement?.tagName` to bypass the shortcut logic if the focus is on an interactive input field (`"INPUT"` or `"TEXTAREA"`).
+## 2024-06-01 - Add Clear Button to Chat Input
+**Learning:** Implementing a conditional clear ('X') button on the search input significantly enhances usability, allowing users to discard long queries immediately instead of repeatedly tapping backspace. Ensuring the button maintains accessible ARIA labels, hover states, and restores focus to the input prevents disruptions to the keyboard navigation flow.
+**Action:** For all future primary search or chat inputs in the app, always consider providing a clear action button with setInput('') and ref.current?.focus() when the input is non-empty.
+## 2024-06-02 - Chat Message and Input Accessibility
+**Learning:** Screen readers announce visual messaging blocks identically if there is no hidden semantic distinction. Adding visually hidden `sr-only` text ("You said:"/"Bot said:") allows non-visual differentiation of chat sources without altering the UI. Also, using `aria-describedby` links visual shortcut hints explicitly to the input field so they are discovered on focus, which improves discoverability of shortcuts for screen reader users.
+**Action:** Always include semantic context text via `sr-only` elements when message roles are only implied by layout/color. Link secondary instruction or shortcut hint text directly to the interactive element it references using `aria-describedby`.
+## 2025-03-05 - Contextual Accessibility for Repeated Actions
+
+**Learning:** In UI lists or chat streams where each result generates identical action buttons (e.g., 'Download File'), relying solely on the visible button text creates an accessibility failure. A screen reader user navigating by interactive elements will just hear "Download File" repeated with no context of *which* file they are downloading.
+
+**Action:** Whenever implementing lists or repeating elements with identical action buttons, always inject contextual payload data into a dynamic `aria-label` (e.g., `aria-label={`Download ${bookName}`}`) to ensure screen reader users can distinguish between them.

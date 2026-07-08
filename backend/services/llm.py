@@ -6,7 +6,17 @@ import logging
 import httpx
 from typing import Dict, Any
 
+from services.security import check_url_hook
+
 logger = logging.getLogger(__name__)
+
+_shared_client: httpx.AsyncClient | None = None
+
+def get_shared_client() -> httpx.AsyncClient:
+    global _shared_client
+    if _shared_client is None or _shared_client.is_closed:
+        _shared_client = httpx.AsyncClient(timeout=60.0, event_hooks={"request": [check_url_hook]})
+    return _shared_client
 
 JSON_BLOCK_RE = re.compile(r'```(?:json)?\s*(.*?)\s*```', re.DOTALL)
 
@@ -127,29 +137,29 @@ You must output ONLY valid JSON in this exact structure:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
-            resp.raise_for_status()
-            res_json = resp.json()
+        client = get_shared_client()
+        resp = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
+        resp.raise_for_status()
+        res_json = resp.json()
 
-            content = res_json['choices'][0]['message'].get('content')
-            if not content:
-                 content = "{}"
+        content = res_json['choices'][0]['message'].get('content')
+        if not content:
+             content = "{}"
 
-            metadata = extract_json_from_response(content)
+        metadata = extract_json_from_response(content)
 
-            # Ensure required fields exist
-            if "title" not in metadata:
-                metadata["title"] = user_message
-            if "format" not in metadata:
-                metadata["format"] = "pdf"
-            if "fuzzy" not in metadata:
-                metadata["fuzzy"] = True
+        # Ensure required fields exist
+        if "title" not in metadata:
+            metadata["title"] = user_message
+        if "format" not in metadata:
+            metadata["format"] = "pdf"
+        if "fuzzy" not in metadata:
+            metadata["fuzzy"] = True
 
-            if is_exact:
-                metadata["fuzzy"] = False
+        if is_exact:
+            metadata["fuzzy"] = False
 
-            return metadata
+        return metadata
 
     except Exception as e:
         logger.error(f"Failed to get metadata from AI: {e}")

@@ -1,5 +1,5 @@
 # pyre-ignore-all-errors - triggered reload
-from fastapi import FastAPI, HTTPException, Response  # type: ignore
+from fastapi import FastAPI, Request, HTTPException, Response  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 from fastapi.responses import StreamingResponse # type: ignore
 from services.llm import extract_metadata_from_query
@@ -26,11 +26,21 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:3001").split(",")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -165,7 +175,7 @@ async def chat_stream_generator(user_message: str):
 
     except Exception as e:
         logger.error(f"Error in chat stream: {e}", exc_info=True)
-        final = {"type": "result", "data": {"status": "fail", "reason": f"An error occurred: {str(e)}"}}
+        final = {"type": "result", "data": {"status": "fail", "reason": "An internal error occurred."}}
         yield f"data: {json.dumps(final)}\n\n"
 
 
@@ -231,24 +241,35 @@ async def download_endpoint(url: str):
             response = await client.get(url)
             response.raise_for_status()
 
-            headers: dict[str, str] = dict(response.headers)
-            # Remove transfer-encoding as we're reading the whole content
-            headers.pop("transfer-encoding", None)
+            # Use a strict allow-list for upstream headers to prevent Header Injection (e.g., Set-Cookie, XSS)
+            safe_headers = {"content-type", "content-length"}
+            headers: dict[str, str] = {
+                k.lower(): v for k, v in response.headers.items() if k.lower() in safe_headers
+            }
+            if "content-type" not in headers:
+                headers["content-type"] = "application/octet-stream"
 
             # Suggest a filename from the URL or Content-Disposition
             content_disposition = response.headers.get("content-disposition")
             if content_disposition:
-                headers["Content-Disposition"] = content_disposition
+                # Sanitize upstream header to prevent HTTP header injection
+                sanitized_disposition = re.sub(r'[\r\n]', '', content_disposition)
+                headers["content-disposition"] = sanitized_disposition
             else:
                 filename = url.split("/")[-1]
                 if not filename or "?" in filename:
                     filename = "downloaded_file"
-                headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+                # Sanitize filename to prevent HTTP header injection and escaping quotes
+                sanitized_filename = re.sub(r'[\r\n"]', '_', filename)
+                headers["content-disposition"] = f'attachment; filename="{sanitized_filename}"'
 
             return Response(content=response.content, status_code=response.status_code, headers=headers)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Download failed: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Download failed due to an internal error.")
 
 
 def _is_valid_md5(value: str) -> bool:
