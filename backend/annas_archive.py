@@ -108,7 +108,7 @@ async def search_books(
         url = f"{BASE_URL}/search?index=&q={q}&content={content}&ext={file_type}&sort={sort}"
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
         context = await browser.new_context(
             user_agent=HEADERS["User-Agent"],
             extra_http_headers={"Accept-Language": HEADERS["Accept-Language"]}
@@ -244,7 +244,7 @@ async def get_book_info(book_url: str) -> dict:  # pyre-ignore
     Also automatically resolves the mirror page to get the final download URL.
     """
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
         context = await browser.new_context(
             user_agent=HEADERS["User-Agent"],
             extra_http_headers={"Accept-Language": HEADERS["Accept-Language"]}
@@ -451,7 +451,11 @@ async def resolve_slow_download(md5: str, servers=(0, 1, 2, 3), headless: Option
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=headless,
-            args=["--disable-blink-features=AutomationControlled"],
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+            ],
         )
         context = await browser.new_context(
             user_agent=HEADERS["User-Agent"],

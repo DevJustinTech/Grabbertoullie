@@ -1,9 +1,10 @@
 fastapi
-uvicorn
 httpx
 python-dotenv
 pydantic
 beautifulsoup4
 curl_cffi
 rapidfuzz
-playwright
+uvicorn[standard]
+# Pinned to match the Playwright Docker base image (mcr.microsoft.com/playwright/python:v1.59.0-jammy)
+playwright==1.59.0
