@@ -24,10 +24,11 @@ RUN python -m playwright install chromium
 # Application code
 COPY . ./
 
-# Hugging Face Spaces routes external traffic to this port (see README app_port).
-ENV PORT=7860
-EXPOSE 7860
+# The platform injects the port to listen on via $PORT (Cloud Run uses 8080).
+ENV PORT=8080
+EXPOSE 8080
 
 # Run the API under a virtual framebuffer so the headed browser works.
-CMD ["xvfb-run", "-a", "--server-args=-screen 0 1280x1024x24", \
-     "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Shell form so ${PORT} is expanded at runtime.
+CMD xvfb-run -a --server-args="-screen 0 1280x1024x24" \
+    uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}
