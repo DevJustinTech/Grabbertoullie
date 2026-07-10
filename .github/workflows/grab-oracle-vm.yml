@@ -6,7 +6,7 @@ name: Grab Oracle A1 VM
 
 on:
   schedule:
-    - cron: '*/15 * * * *'   # every 15 minutes
+    - cron: '*/10 * * * *'   # every 10 minutes
   workflow_dispatch:           # lets you run it manually from the Actions tab
 
 concurrency:
