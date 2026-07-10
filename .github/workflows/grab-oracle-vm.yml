@@ -1,0 +1,113 @@
+name: Grab Oracle A1 VM
+
+# Keeps trying to launch a free Ampere A1 instance until Oracle has capacity.
+# Runs on GitHub's servers, so it works even when your PC is off.
+# When it lands one, it opens an issue to notify you and disables itself.
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # every 30 minutes
+  workflow_dispatch:           # lets you run it manually from the Actions tab
+
+concurrency:
+  group: oci-launch
+  cancel-in-progress: false
+
+permissions:
+  issues: write
+  actions: write
+  contents: read
+
+jobs:
+  launch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard (skip until secrets are set)
+        id: guard
+        env:
+          U: ${{ secrets.OCI_CLI_USER }}
+          S: ${{ secrets.OCI_SUBNET_ID }}
+        run: |
+          if [ -z "${U:-}" ] || [ -z "${S:-}" ]; then
+            echo "Secrets not configured yet — skipping this run."
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install OCI CLI
+        if: steps.guard.outputs.skip != '1'
+        run: pip install --quiet oci-cli
+
+      - name: Configure OCI auth
+        if: steps.guard.outputs.skip != '1'
+        env:
+          KEY_CONTENT: ${{ secrets.OCI_CLI_KEY_CONTENT }}
+          U: ${{ secrets.OCI_CLI_USER }}
+          F: ${{ secrets.OCI_CLI_FINGERPRINT }}
+          T: ${{ secrets.OCI_CLI_TENANCY }}
+          R: ${{ secrets.OCI_CLI_REGION }}
+        run: |
+          mkdir -p ~/.oci
+          printf '%s\n' "$KEY_CONTENT" > ~/.oci/key.pem
+          chmod 600 ~/.oci/key.pem
+          {
+            echo "[DEFAULT]"
+            echo "user=$U"
+            echo "fingerprint=$F"
+            echo "tenancy=$T"
+            echo "region=$R"
+            echo "key_file=$HOME/.oci/key.pem"
+          } > ~/.oci/config
+          chmod 600 ~/.oci/config
+
+      - name: Attempt launch across all ADs
+        if: steps.guard.outputs.skip != '1'
+        id: launch
+        env:
+          COMPARTMENT_ID: ${{ secrets.OCI_CLI_TENANCY }}
+          SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
+          IMAGE_ID: ${{ secrets.OCI_IMAGE_ID }}
+          SSH_PUBKEY: ${{ secrets.OCI_SSH_PUBKEY }}
+        run: |
+          set -uo pipefail
+          # Don't launch a second one if an instance already exists.
+          EXISTING=$(oci compute instance list --compartment-id "$COMPARTMENT_ID" --all 2>/dev/null \
+            | jq '[.data[]? | select(.["lifecycle-state"]!="TERMINATED" and .["lifecycle-state"]!="TERMINATING")] | length' 2>/dev/null || echo 0)
+          EXISTING=${EXISTING:-0}
+          if [ "$EXISTING" != "0" ]; then
+            echo "An instance already exists (not terminated). Nothing to do."
+            exit 0
+          fi
+          printf '%s\n' "$SSH_PUBKEY" > /tmp/id.pub
+          for AD in "davw:EU-FRANKFURT-1-AD-1" "davw:EU-FRANKFURT-1-AD-2" "davw:EU-FRANKFURT-1-AD-3"; do
+            echo "Trying $AD ..."
+            if oci compute instance launch \
+                --compartment-id "$COMPARTMENT_ID" \
+                --availability-domain "$AD" \
+                --shape VM.Standard.A1.Flex \
+                --shape-config '{"ocpus":2,"memoryInGBs":12}' \
+                --image-id "$IMAGE_ID" \
+                --subnet-id "$SUBNET_ID" \
+                --assign-public-ip true \
+                --display-name Grabbertoullie \
+                --ssh-authorized-keys-file /tmp/id.pub >/tmp/out 2>/tmp/err; then
+              echo "🎉 Launched in $AD"
+              echo "landed=yes" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if grep -qi "capacity" /tmp/err; then
+              echo "  still out of capacity"
+            else
+              echo "  non-capacity error:"; cat /tmp/err
+            fi
+          done
+          echo "No capacity this run; will retry next schedule."
+
+      - name: Notify and stop retrying when it lands
+        if: steps.launch.outputs.landed == 'yes'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "🎉 Oracle A1 VM landed" \
+            --body "The scheduled workflow grabbed your Ampere A1 instance. Open the OCI Console → Compute → Instances to get its public IP, then continue the deploy. This workflow has been disabled to save Actions minutes; re-enable it from the Actions tab if you ever need it again." || true
+          gh workflow disable grab-oracle-vm.yml || true
