@@ -32,6 +32,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/healthz")
+async def healthz():
+    return {"status": "ok"}
+
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)

@@ -1,0 +1,40 @@
+name: Keep HF Space awake
+
+# Free Hugging Face Spaces pause after ~48h without traffic. A daily ping of
+# the lightweight /healthz route keeps the Space running without triggering
+# any real search work.
+#
+# Uses the same HF_SPACE repo variable as deploy-hf-space.yml.
+
+on:
+  schedule:
+    - cron: "23 7 * * *" # daily, well inside the 48h sleep window
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the Space
+        env:
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          if [ -z "$HF_SPACE" ]; then
+            echo "Missing HF_SPACE variable" >&2
+            exit 1
+          fi
+          # Space subdomain is the id lowercased with / _ . turned into dashes
+          host=$(echo "$HF_SPACE" | tr '[:upper:]' '[:lower:]' | sed 's|[/_.]|-|g')
+          url="https://${host}.hf.space/healthz"
+          echo "Pinging $url"
+          for attempt in 1 2 3; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 120 "$url" || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "Space is awake (HTTP 200)"
+              exit 0
+            fi
+            echo "Attempt $attempt: HTTP $code — Space may be waking up, retrying in 60s"
+            sleep 60
+          done
+          echo "Space did not answer after 3 attempts" >&2
+          exit 1
