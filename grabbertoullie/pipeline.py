@@ -16,7 +16,7 @@ from .search import (
     search_project_gutenberg,
     search_semantic_scholar
 )
-from services.security import check_url_hook
+from .security import check_url_hook
 
 logger = logging.getLogger(__name__)
 

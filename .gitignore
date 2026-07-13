@@ -6,3 +6,8 @@ backend/venv/
 *.log
 .env
 .env.local
+
+# Python packaging build artifacts
+*.egg-info/
+build/
+dist/

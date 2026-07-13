@@ -6,9 +6,9 @@ import logging
 import asyncio
 from typing import Dict, Any, List, Optional, Tuple
 from bs4 import BeautifulSoup # type: ignore
-from zlib_scraper import search_books, get_book_info
-from annas_archive import search_books as annas_search_books
-from services.security import check_url_hook
+from .zlib_scraper import search_books, get_book_info
+from .annas_archive import search_books as annas_search_books
+from .security import check_url_hook
 
 logger = logging.getLogger(__name__)
 

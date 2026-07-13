@@ -6,7 +6,7 @@ import logging
 import httpx
 from typing import Dict, Any
 
-from services.security import check_url_hook
+from .security import check_url_hook
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +54,10 @@ def _fallback_extract(user_message: str) -> Dict[str, Any]:
         # Remove [exact] case-insensitively
         user_message = re.sub(r'\[exact\]', '', user_message, flags=re.IGNORECASE).strip()
 
-    # Try to extract format at the end
-    fmt = "pdf"
+    # Try to extract format at the end. Default to "any" so a query with no
+    # explicit format isn't silently narrowed to PDF (which hides EPUB-only
+    # books — a large share of modern fiction on these sources).
+    fmt = "any"
     msg_lower = user_message.lower()
     if msg_lower.endswith(" pdf"):
         fmt = "pdf"
@@ -108,7 +110,7 @@ Extract the following fields:
 - title: The EXACT title of the book, stripped of the author's name and unnecessary punctuation.
 - author: The author of the book (if mentioned).
 - year: The publication year (if mentioned).
-- format: The preferred file format ('pdf', 'epub', or 'any'). Defaults to 'pdf' if unclear.
+- format: The preferred file format ('pdf', 'epub', or 'any'). Defaults to 'any' if the user does not clearly request a specific format.
 - fuzzy: true or false. Set to true if the query is ambiguous, missing an author, has a partial title, or is a vague description. Set to false if it's a very specific, exact request with title and author.
 
 OUTPUT FORMAT:
@@ -117,7 +119,7 @@ You must output ONLY valid JSON in this exact structure:
   "title": "Exact Book Title",
   "author": "Author Name",
   "year": "1984",
-  "format": "pdf",
+  "format": "any",
   "fuzzy": false
 }
 """
@@ -152,7 +154,7 @@ You must output ONLY valid JSON in this exact structure:
         if "title" not in metadata:
             metadata["title"] = user_message
         if "format" not in metadata:
-            metadata["format"] = "pdf"
+            metadata["format"] = "any"
         if "fuzzy" not in metadata:
             metadata["fuzzy"] = True
 

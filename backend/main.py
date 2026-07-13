@@ -2,9 +2,9 @@
 from fastapi import FastAPI, Request, HTTPException, Response  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 from fastapi.responses import StreamingResponse # type: ignore
-from services.llm import extract_metadata_from_query
-from services.pipeline import perform_parallel_search, score_and_rank_results, format_best_result, needs_disambiguation, generate_disambiguation_payload, validate_url  # pyre-ignore
-from annas_archive import resolve_slow_download
+from grabbertoullie.llm import extract_metadata_from_query
+from grabbertoullie.pipeline import perform_parallel_search, score_and_rank_results, format_best_result, needs_disambiguation, generate_disambiguation_payload, validate_url  # pyre-ignore
+from grabbertoullie.annas_archive import resolve_slow_download
 
 import asyncio
 import socket

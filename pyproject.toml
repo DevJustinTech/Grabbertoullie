@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "grabbertoullie"
+version = "0.1.0"
+description = "Search multiple book sources in parallel for a direct download link (PDF/EPUB)."
+readme = "grabbertoullie/README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["books", "ebook", "search", "scraper", "cli"]
+dependencies = [
+    "httpx",
+    "beautifulsoup4",
+    "rapidfuzz",
+    "playwright==1.59.0",
+]
+
+[project.scripts]
+grabbertoullie = "grabbertoullie.cli:main"
+
+[tool.setuptools]
+packages = ["grabbertoullie"]

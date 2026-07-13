@@ -4,7 +4,11 @@ import ipaddress
 import httpx
 from urllib.parse import urlparse
 from typing import Tuple
-from fastapi import HTTPException
+
+
+class SSRFError(Exception):
+    """Raised when a request/redirect targets a private or restricted address."""
+
 
 async def is_valid_url(url: str) -> Tuple[bool, str]:
     try:
@@ -23,8 +27,12 @@ async def is_valid_url(url: str) -> Tuple[bool, str]:
         try:
             # Prevent SSRF: Resolve to IP and block private/loopback/restricted IPs.
             # Use getaddrinfo to support both IPv4 and IPv6 to prevent IPv6 bypasses.
+            # Offload the *synchronous* socket.getaddrinfo to a thread rather than
+            # using loop.getaddrinfo: the loop's built-in resolver fails with
+            # gaierror on Windows under the Proactor event loop (asyncio.run),
+            # which the sync resolver handles fine on every platform.
             loop = asyncio.get_running_loop()
-            addr_info = await loop.getaddrinfo(hostname, None)
+            addr_info = await loop.run_in_executor(None, socket.getaddrinfo, hostname, None)
             for res in addr_info:
                 ip = res[4][0]
                 ip_obj = ipaddress.ip_address(ip)
@@ -43,5 +51,4 @@ async def check_url_hook(request: httpx.Request):
     # Prevent SSRF by validating redirects using the same is_valid_url logic
     valid, reason = await is_valid_url(str(request.url))
     if not valid:
-        # Instead of ValueError, we can raise an HTTPException so it is handled correctly by FastAPI
-        raise HTTPException(status_code=400, detail=f"SSRF Attempt blocked: {reason}")
+        raise SSRFError(f"SSRF attempt blocked: {reason}")

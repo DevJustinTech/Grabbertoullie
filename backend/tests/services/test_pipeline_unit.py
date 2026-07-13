@@ -19,7 +19,7 @@ sys.modules["curl_cffi.requests"] = MagicMock()
 
 import pytest
 # Absolute import for better reliability across different test runners
-from services.pipeline import format_best_result
+from grabbertoullie.pipeline import format_best_result
 
 def test_format_best_result_pdf_happy_path():
     best = {
