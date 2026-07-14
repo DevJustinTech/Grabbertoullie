@@ -1,0 +1,53 @@
+{
+  "name": "grabbertoullie",
+  "displayName": "Grabbertoullie",
+  "description": "Search multiple book sources for a direct download link, from inside VS Code.",
+  "version": "0.1.0",
+  "publisher": "grabbertoullie",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "books",
+    "ebook",
+    "search",
+    "download"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "grabbertoullie.search",
+        "title": "Grabbertoullie: Search for a Book"
+      }
+    ],
+    "configuration": {
+      "title": "Grabbertoullie",
+      "properties": {
+        "grabbertoullie.cliPath": {
+          "type": "string",
+          "default": "grabbertoullie",
+          "markdownDescription": "Path to the `grabbertoullie` CLI. Defaults to `grabbertoullie` on your PATH. Point this at a virtualenv, e.g. `C:\\\\path\\\\to\\\\.venv\\\\Scripts\\\\grabbertoullie.exe`, if it isn't installed globally."
+        },
+        "grabbertoullie.groqApiKey": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Optional Groq API key for smarter query parsing. Leave blank to use the built-in regex parser."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}
