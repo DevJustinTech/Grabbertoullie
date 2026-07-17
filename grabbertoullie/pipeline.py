@@ -144,12 +144,12 @@ def calculate_score(result: Dict[str, Any], metadata: Dict[str, Any]) -> int:
     Scores a result based on how well it matches the metadata.
     """
     score = 0
-    target_title  = metadata.get("title",  "").lower()
-    target_author = metadata.get("author", "").lower()
-    target_format = metadata.get("format", "pdf").lower()
+    target_title  = (metadata.get("title")  or "").lower()
+    target_author = (metadata.get("author") or "").lower()
+    target_format = (metadata.get("format") or "pdf").lower()
 
-    res_title  = result.get("title",  "").lower()
-    res_author = result.get("author", "").lower()
+    res_title  = (result.get("title")  or "").lower()
+    res_author = (result.get("author") or "").lower()
 
     # Base weight from the source
     score += result.get("weight", 0) * 10
