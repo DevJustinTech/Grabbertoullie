@@ -1,0 +1,17 @@
+# Web layer (backend/main.py)
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+
+# Engine (grabbertoullie package — copied into the bundle at deploy time)
+httpx
+beautifulsoup4
+rapidfuzz
+curl_cffi
+
+# Browser automation. Pinned to match the Chromium build Playwright downloads.
+playwright==1.59.0
+
+# Starts an Xvfb virtual display for the headed Anna's-download resolver.
+pyvirtualdisplay
