@@ -75,7 +75,7 @@ git clone https://github.com/DevJustinTech/Grabbertoullie.git
 cd Grabbertoullie
 
 # Build the backend image (first build ~8-12 min: it pulls Chromium)
-sudo docker build -t grabbertoullie ./backend
+sudo docker build -t grabbertoullie .
 ```
 
 Run the container (replace the two env values):
@@ -151,7 +151,7 @@ curl -s -o /dev/null -w "%{http_code}\n" https://grabbertoullie.duckdns.org/docs
 ## Updating later
 ```bash
 cd ~/Grabbertoullie && git pull
-sudo docker build -t grabbertoullie ./backend
+sudo docker build -t grabbertoullie .
 sudo docker rm -f grabbertoullie
 # re-run the Phase 4 `docker run` command
 ```

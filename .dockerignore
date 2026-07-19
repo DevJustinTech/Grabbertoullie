@@ -1,0 +1,33 @@
+# Not part of the backend image
+frontend/
+vscode-extension/
+hf-space/
+.git/
+.github/
+.vscode/
+grabbertoullie.egg-info/
+
+# Virtualenvs (huge, host-specific)
+**/.venv/
+**/venv/
+
+# Python caches
+**/__pycache__/
+**/*.pyc
+
+# Secrets & logs (provided via platform env vars, never baked into the image)
+**/.env
+**/*.log
+
+# Local-only dev/debug/test scripts and scratch files
+backend/debug_*.py
+backend/test_*.py
+backend/tests/
+backend/_*.py
+
+# Tooling / editor config not needed at runtime
+backend/.pyre_configuration
+backend/pyrightconfig.json
+backend/setup.cfg
+**/.gitignore
+.dockerignore

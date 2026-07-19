@@ -1,5 +1,7 @@
 # Grabbertoullie backend — FastAPI + Playwright (Chromium).
 #
+# Built from the repo root so the image gets both the FastAPI app (backend/)
+# and the core engine package (grabbertoullie/), which backend/main.py imports.
 # Uses the official Playwright image so Chromium and all of its system
 # dependencies are preinstalled and version-matched. Runs the app under Xvfb
 # so the Anna's Archive download resolver's *headed* browser has a virtual
@@ -15,14 +17,20 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Python dependencies
-COPY requirements.txt ./
+COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Core engine package. Its dependencies are already pinned in requirements.txt,
+# hence --no-deps.
+COPY pyproject.toml ./
+COPY grabbertoullie/ ./grabbertoullie/
+RUN pip install --no-cache-dir --no-deps .
 
 # Ensure the Chromium build matching this Playwright version is present.
 RUN python -m playwright install chromium
 
 # Application code
-COPY . ./
+COPY backend/ ./
 
 # The platform injects the port to listen on via $PORT (Cloud Run uses 8080).
 ENV PORT=8080

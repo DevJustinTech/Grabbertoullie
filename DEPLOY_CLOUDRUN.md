@@ -30,7 +30,7 @@ From the repo root (`Grabbertoullie/`), one command builds the Dockerfile and de
 
 ```bash
 gcloud run deploy grabbertoullie \
-  --source ./backend \
+  --source . \
   --region europe-west1 \
   --memory 2Gi \
   --cpu 2 \
@@ -41,7 +41,8 @@ gcloud run deploy grabbertoullie \
 ```
 
 - The **first** run asks to enable APIs (Cloud Build, Artifact Registry, Run) — answer **y**.
-- It uploads `./backend`, builds the container in the cloud (~8–12 min the first time — it pulls
+- It uploads the repo (the Dockerfile lives at the root so the image gets both `backend/` and the
+  `grabbertoullie` package), builds the container in the cloud (~8–12 min the first time — it pulls
   Chromium), and deploys.
 - When done it prints a **Service URL** like `https://grabbertoullie-xxxxxxxx.run.app` — that's your
   backend, with HTTPS already working.
