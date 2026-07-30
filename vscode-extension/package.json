@@ -2,12 +2,20 @@
   "name": "grabbertoullie",
   "displayName": "Grabbertoullie",
   "description": "Search multiple book sources for a direct download link, from inside VS Code.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "grabbertoullie",
+  "icon": "icon.png",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DevJustinTech/Grabbertoullie.git",
+    "directory": "vscode-extension"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
+    "Education",
     "Other"
   ],
   "keywords": [

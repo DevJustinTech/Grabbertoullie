@@ -34,6 +34,58 @@ export function fileFormat(c: Candidate): string {
 
 export class CliNotFoundError extends Error {}
 
+const ANNAS_MD5_RE = /\/(?:md5|slow_download)\/([a-f0-9]{32})/i;
+
+/** Pulls the md5 out of an Anna's Archive `/md5/...` or `/slow_download/...` URL. */
+export function extractAnnasMd5(url: string): string | null {
+  const m = ANNAS_MD5_RE.exec(url);
+  return m ? m[1] : null;
+}
+
+/**
+ * Resolve an Anna's Archive md5 to its actual file URL by driving the
+ * slow-download flow (`grabbertoullie --resolve-annas <md5>`). This opens a
+ * visible browser window and can take up to ~2 minutes. Resolves to `null`
+ * (rather than rejecting) on any failure other than the CLI itself being
+ * missing, so callers can fall back to the mirror page link.
+ */
+export function resolveAnnasDownload(
+  md5: string,
+  opts: { cliPath: string; cwd?: string; timeoutMs?: number }
+): Promise<string | null> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      opts.cliPath,
+      ["--resolve-annas", md5],
+      {
+        cwd: opts.cwd,
+        timeout: opts.timeoutMs ?? 150_000,
+        maxBuffer: 10 * 1024 * 1024,
+        windowsHide: true,
+      },
+      (error, stdout) => {
+        if (error && (error as NodeJS.ErrnoException).code === "ENOENT") {
+          return reject(
+            new CliNotFoundError(
+              `Could not find the grabbertoullie CLI at "${opts.cliPath}". ` +
+                `Install it with "pipx install git+https://github.com/DevJustinTech/Grabbertoullie.git" ` +
+                `or set "grabbertoullie.cliPath" to the executable.`
+            )
+          );
+        }
+
+        const text = (stdout || "").trim();
+        try {
+          const parsed = JSON.parse(text);
+          return resolve(parsed.download_url || null);
+        } catch {
+          return resolve(null);
+        }
+      }
+    );
+  });
+}
+
 /**
  * Run `grabbertoullie <query> --all --json` and return the ranked candidates
  * (best first). Throws CliNotFoundError if the CLI cannot be located.
@@ -59,7 +111,10 @@ export function runSearch(query: string, opts: SearchOptions): Promise<Candidate
       {
         env,
         cwd: opts.cwd,
-        timeout: opts.timeoutMs ?? 120_000,
+        // Generous default: the very first search may trigger a one-time
+        // ~150 MB Chromium download (the CLI installs the Playwright browser
+        // on demand), which can take a few minutes on a slow connection.
+        timeout: opts.timeoutMs ?? 300_000,
         maxBuffer: 10 * 1024 * 1024,
         windowsHide: true,
       },
@@ -83,8 +138,8 @@ export function runSearch(query: string, opts: SearchOptions): Promise<Candidate
           return reject(
             new CliNotFoundError(
               `Could not find the grabbertoullie CLI at "${opts.cliPath}". ` +
-                `Install it with "pip install grabbertoullie" or set ` +
-                `"grabbertoullie.cliPath" to the executable.`
+                `Install it with "pipx install git+https://github.com/DevJustinTech/Grabbertoullie.git" ` +
+                `or set "grabbertoullie.cliPath" to the executable.`
             )
           );
         }

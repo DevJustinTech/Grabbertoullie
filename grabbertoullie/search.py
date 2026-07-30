@@ -340,10 +340,14 @@ async def search_annas_archive(title: str, author: str = "", fmt: str = "any") -
     try:
         annas_results = await annas_search_books(query_str, file_type=file_type)
 
-        # Anna's Archive protects its download mirrors behind a browser-verification
-        # challenge that can't be resolved headlessly, so we surface the book's
-        # detail page (/md5/...) as the link and let the user complete the download
-        # there. The frontend opens Anna's Archive links directly in a new tab.
+        # Getting Anna's Archive's actual file link requires clearing a
+        # browser-verification challenge (see resolve_slow_download in
+        # annas_archive.py), which is too slow and too request-heavy to do for
+        # every search result up front — doing it eagerly here previously
+        # tripped Anna's Archive's rate limiting after a handful of searches.
+        # So the search step just surfaces the cheap /md5/ detail-page link;
+        # the frontend resolves the real file link on demand when the user
+        # acts on a specific result (see SearchPanel.resolveForAction).
         for item in annas_results[:5]:
             link = item.get("link")
             if not link:

@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import asyncio
 import argparse
+import subprocess
+import sys
 from collections import defaultdict
 from dataclasses import dataclass, asdict
 from typing import Optional
@@ -81,6 +83,70 @@ def _clean(text: Optional[str]) -> str:
     return (text or "").strip()
 
 
+# ── Browser bootstrap ─────────────────────────────────────────────────────────
+
+# The package depends on Playwright but the Chromium binary it drives is a
+# separate ~150 MB download that normally requires a manual `playwright install
+# chromium`. Extension and pipx users rarely run that by hand, so instead of
+# failing on the first launch we detect the missing-browser error, install
+# Chromium once, and retry transparently.
+
+_browser_ready = False
+_browser_install_lock = asyncio.Lock()
+
+
+def _is_missing_browser_error(exc: Exception) -> bool:
+    """True if `exc` is Playwright complaining the browser isn't installed."""
+    msg = str(exc).lower()
+    return "executable doesn't exist" in msg or "playwright install" in msg
+
+
+async def _install_chromium() -> None:
+    """Run `playwright install chromium` once, in a worker thread."""
+    global _browser_ready
+    async with _browser_install_lock:
+        if _browser_ready:
+            return
+        # Progress goes to stderr so it never corrupts the JSON that the CLI
+        # writes to stdout (which the VS Code extension parses).
+        print(
+            "Grabbertoullie: Chromium for Playwright isn't installed yet — "
+            "downloading it now (first run only, ~150 MB). This may take a "
+            "minute…",
+            file=sys.stderr,
+            flush=True,
+        )
+        proc = await asyncio.to_thread(
+            subprocess.run,
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(
+                "Automatic Chromium install failed. Run this once by hand:\n"
+                "    playwright install chromium\n\n"
+                + (proc.stderr or proc.stdout or "")
+            )
+        _browser_ready = True
+
+
+async def _launch_chromium(p, **kwargs):
+    """Launch Chromium, installing the browser on first run if it's missing.
+
+    pipx/extension users don't run `playwright install chromium` by hand, so the
+    first launch can fail with "Executable doesn't exist". Catch that one case,
+    install Chromium, and retry once. Any other launch failure propagates.
+    """
+    try:
+        return await p.chromium.launch(**kwargs)
+    except Exception as exc:
+        if not _is_missing_browser_error(exc):
+            raise
+        await _install_chromium()
+        return await p.chromium.launch(**kwargs)
+
+
 # ── Step 1 — Search ───────────────────────────────────────────────────────────
 
 async def search_books(
@@ -108,7 +174,7 @@ async def search_books(
         url = f"{BASE_URL}/search?index=&q={q}&content={content}&ext={file_type}&sort={sort}"
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+        browser = await _launch_chromium(p, headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
         context = await browser.new_context(
             user_agent=HEADERS["User-Agent"],
             extra_http_headers={"Accept-Language": HEADERS["Accept-Language"]}
@@ -244,7 +310,7 @@ async def get_book_info(book_url: str) -> dict:  # pyre-ignore
     Also automatically resolves the mirror page to get the final download URL.
     """
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+        browser = await _launch_chromium(p, headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
         context = await browser.new_context(
             user_agent=HEADERS["User-Agent"],
             extra_http_headers={"Accept-Language": HEADERS["Accept-Language"]}
@@ -449,7 +515,8 @@ async def resolve_slow_download(md5: str, servers=(0, 1, 2, 3), headless: Option
         headless = _ANNAS_HEADLESS
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(
+        browser = await _launch_chromium(
+            p,
             headless=headless,
             args=[
                 "--disable-blink-features=AutomationControlled",
@@ -473,6 +540,9 @@ async def resolve_slow_download(md5: str, servers=(0, 1, 2, 3), headless: Option
                 except Exception as exc:
                     print(f"slow server {server} failed: {exc}")
                     continue
+            return None
+        except Exception as exc:
+            print(f"Could not resolve download URL for {md5}: {exc}")
             return None
         finally:
             await browser.close()

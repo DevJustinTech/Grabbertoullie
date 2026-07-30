@@ -54,6 +54,13 @@ def _print_candidates(results: list) -> None:
 async def _run(args: argparse.Namespace) -> int:
     from . import search, search_raw
 
+    if args.resolve_annas:
+        from .annas_archive import resolve_slow_download
+
+        url = await resolve_slow_download(args.resolve_annas)
+        print(json.dumps({"download_url": url}))
+        return 0 if url else 1
+
     groq = os.getenv("GROQ_API_KEY")
     if args.all:
         results = await search_raw(
@@ -81,7 +88,7 @@ def main() -> None:
         prog="grabbertoullie",
         description="Search multiple book sources for a direct download link.",
     )
-    parser.add_argument("query", help="Book title / author / ISBN")
+    parser.add_argument("query", nargs="?", help="Book title / author / ISBN")
     parser.add_argument(
         "--format", "-f",
         choices=["pdf", "epub", "any"],
@@ -93,7 +100,20 @@ def main() -> None:
         "--all", action="store_true", help="Show all ranked candidates, not just the best"
     )
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
+    parser.add_argument(
+        "--resolve-annas",
+        metavar="MD5",
+        default=None,
+        help=(
+            "Resolve an Anna's Archive md5 to its actual file URL by driving the "
+            "slow-download flow (opens a visible browser window; can take up to "
+            "~2 minutes). Prints {\"download_url\": ...} and ignores query/--all/--format."
+        ),
+    )
     args = parser.parse_args()
+
+    if not args.query and not args.resolve_annas:
+        parser.error("query is required unless --resolve-annas is given")
 
     try:
         sys.exit(asyncio.run(_run(args)))

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "grabbertoullie"
-version = "0.1.0"
+version = "0.1.1"
 description = "Search multiple book sources in parallel for a direct download link (PDF/EPUB)."
 readme = "grabbertoullie/README.md"
 requires-python = ">=3.10"
