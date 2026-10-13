@@ -1,0 +1,27 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "frontend"],
+      "port": 3001
+    },
+    {
+      "name": "earshot",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:/Users/HP/Desktop/earshot/server.mjs", "5273"],
+      "port": 5273
+    },
+    {
+      "name": "portfolio",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "C:/Users/HP/Desktop/ai stuff/retro-portfolio/node_modules/vite/bin/vite.js",
+        "C:/Users/HP/Desktop/ai stuff/retro-portfolio",
+        "--port", "5390", "--strictPort"
+      ],
+      "port": 5390
+    }
+  ]
+}

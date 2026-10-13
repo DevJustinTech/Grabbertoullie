@@ -1,4 +1,4 @@
-venv/
+﻿venv/
 .venv/
 __pycache__/
 *.pyc
@@ -11,3 +11,13 @@ backend/venv/
 *.egg-info/
 build/
 dist/
+node_modules/
+.next/
+out/
+coverage/
+*.py[cod]
+env/
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+.claude/settings.local.json
